@@ -1,0 +1,337 @@
+@import 'tailwindcss';
+@import '@porsche-design-system/components-react/tailwindcss';
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+img, video, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.stack-on-mobile {
+  display: grid;
+  gap: var(--p-spacing-fluid-medium);
+}
+
+@media (max-width: 759px) {
+  .stack-on-mobile {
+    grid-template-columns: 1fr !important;
+  }
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .tour-detail-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .checkout-two-col {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .card-grid-responsive {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .full-width-mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  .col-reverse-mobile {
+    display: flex !important;
+    flex-direction: column-reverse !important;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 759px) {
+  .card-grid-responsive {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  40% {
+    transform: translateX(-50%) translateY(-12px);
+  }
+  60% {
+    transform: translateX(-50%) translateY(-6px);
+  }
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes successPulse {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes checkReveal {
+  0% { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes radialPulse {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.pds-fullcalendar {
+  --fc-border-color: var(--p-color-contrast-low);
+  --fc-today-bg-color: rgba(26, 68, 234, 0.08);
+  --fc-neutral-bg-color: var(--p-color-background-surface);
+  --fc-page-bg-color: var(--p-color-background-surface);
+  --fc-event-border-color: transparent;
+  --fc-button-bg-color: var(--p-color-background-surface);
+  --fc-button-border-color: var(--p-color-contrast-low);
+  --fc-button-text-color: var(--p-color-primary);
+  --fc-button-hover-bg-color: var(--p-color-state-hover);
+  --fc-button-hover-border-color: var(--p-color-contrast-medium);
+  --fc-button-active-bg-color: var(--p-color-contrast-low);
+  --fc-button-active-border-color: var(--p-color-contrast-low);
+  --fc-button-active-text-color: var(--p-color-primary);
+  --fc-small-font-size: 12px;
+  --fc-event-text-color: var(--p-color-primary);
+}
+
+.pds-fullcalendar .fc .fc-toolbar-title {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.pds-fullcalendar .fc .fc-button {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--p-border-radius-sm);
+  padding: 6px 12px;
+  transition: background-color 0.25s cubic-bezier(.25,.1,.25,1),
+              border-color 0.25s cubic-bezier(.25,.1,.25,1);
+}
+
+.pds-fullcalendar .fc .fc-button:focus {
+  box-shadow: 0 0 0 2px var(--p-color-state-focus);
+}
+
+.pds-fullcalendar .fc .fc-button-active,
+.pds-fullcalendar .fc .fc-button.fc-button-active:hover {
+  background-color: var(--p-color-contrast-low);
+  border-color: var(--p-color-contrast-low);
+  color: var(--p-color-primary);
+  font-weight: 600;
+}
+
+.pds-fullcalendar .fc .fc-button-group .fc-button {
+  border-radius: 0;
+}
+
+.pds-fullcalendar .fc .fc-button-group .fc-button:first-child {
+  border-radius: var(--p-border-radius-sm) 0 0 var(--p-border-radius-sm);
+}
+
+.pds-fullcalendar .fc .fc-button-group .fc-button:last-child {
+  border-radius: 0 var(--p-border-radius-sm) var(--p-border-radius-sm) 0;
+}
+
+.pds-fullcalendar .fc .fc-col-header-cell {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--p-color-contrast-medium);
+  padding: 10px 0;
+}
+
+.pds-fullcalendar .fc .fc-daygrid-day-number {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--p-color-primary);
+  padding: 6px 8px;
+}
+
+.pds-fullcalendar .fc .fc-daygrid-day {
+  min-height: 100px;
+  cursor: pointer;
+  transition: background-color 0.25s cubic-bezier(.25,.1,.25,1);
+}
+
+.pds-fullcalendar .fc .fc-daygrid-day:hover {
+  background-color: var(--p-color-state-hover);
+}
+
+.pds-fullcalendar .fc .fc-day-today .fc-daygrid-day-number {
+  background-color: var(--p-color-primary);
+  color: var(--p-color-background-base);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.pds-fullcalendar .fc .fc-daygrid-event {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--p-border-radius-sm);
+  border-left-width: 3px;
+  padding: 1px 4px;
+  margin: 1px 2px;
+  cursor: pointer;
+}
+
+.pds-fullcalendar .fc .fc-daygrid-event:hover {
+  opacity: 0.85;
+}
+
+.pds-fullcalendar .fc .fc-daygrid-more-link {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--p-color-contrast-medium);
+  padding: 2px 4px;
+}
+
+.pds-fullcalendar .fc .fc-day-other .fc-daygrid-day-number {
+  color: var(--p-color-state-disabled);
+}
+
+.pds-fullcalendar .fc .fc-popover {
+  border-radius: var(--p-border-radius-md);
+  border: 1px solid var(--p-color-contrast-low);
+  box-shadow: var(--p-shadow-high);
+  overflow: hidden;
+}
+
+.pds-fullcalendar .fc .fc-popover-header {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background-color: var(--p-color-background-surface);
+  padding: 8px 12px;
+}
+
+.pds-fullcalendar .fc .fc-popover-body {
+  background-color: var(--p-color-background-base);
+  padding: 4px;
+}
+
+.pds-fullcalendar .fc .fc-timegrid-slot {
+  height: 40px;
+}
+
+.pds-fullcalendar .fc .fc-timegrid-slot-label-cushion {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--p-color-contrast-medium);
+}
+
+.pds-fullcalendar .fc .fc-timegrid-event {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--p-border-radius-sm);
+  border-left-width: 3px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.pds-fullcalendar .fc .fc-timegrid-event:hover {
+  opacity: 0.85;
+}
+
+.pds-fullcalendar .fc .fc-timegrid-now-indicator-line {
+  border-color: var(--p-color-notification-error);
+  border-width: 2px;
+}
+
+.pds-fullcalendar .fc .fc-timegrid-now-indicator-arrow {
+  border-color: var(--p-color-notification-error);
+}
+
+.pds-fullcalendar .fc .fc-timegrid-col.fc-day-today {
+  background-color: rgba(26, 68, 234, 0.04);
+}
+
+.pds-fullcalendar .fc .fc-timegrid-axis-cushion {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 11px;
+  color: var(--p-color-contrast-medium);
+}
+
+.pds-fullcalendar .fc .fc-list-event {
+  cursor: pointer;
+}
+
+.pds-fullcalendar .fc .fc-list-event td {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-color: var(--p-color-contrast-low);
+}
+
+.pds-fullcalendar .fc .fc-list-day-cushion {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background-color: var(--p-color-background-surface);
+  padding: 8px 12px;
+}
+
+.pds-fullcalendar .fc .fc-list-event:hover td {
+  background-color: var(--p-color-state-hover);
+}
+
+.pds-fullcalendar .fc-timegrid-event .fc-event-main {
+  padding: 2px 4px;
+}
+
+.pds-fullcalendar .fc .fc-timegrid-event .fc-event-time {
+  font-family: 'Porsche Next', 'Arial Narrow', Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+}
