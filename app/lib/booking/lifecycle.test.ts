@@ -158,8 +158,9 @@ describe("the hold sweeper — rule B5, defect 11", () => {
   });
 
   it("refuses a nonsense TTL rather than sweeping everything", async () => {
-    await expect(sweepExpiredHolds({ ...env, HOLD_TTL_MINUTES: "0" } as Env, T0)).rejects.toThrow();
-    await expect(sweepExpiredHolds({ ...env, HOLD_TTL_MINUTES: "nope" } as Env, T0)).rejects.toThrow();
+    await expect(sweepExpiredHolds({ DB: env.DB, HOLD_TTL_MINUTES: "0" }, T0)).rejects.toThrow();
+    await expect(sweepExpiredHolds({ DB: env.DB, HOLD_TTL_MINUTES: "nope" }, T0)).rejects.toThrow();
+    await expect(sweepExpiredHolds({ DB: env.DB, HOLD_TTL_MINUTES: "-5" }, T0)).rejects.toThrow();
   });
 });
 

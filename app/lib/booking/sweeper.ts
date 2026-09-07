@@ -19,7 +19,18 @@ export interface SweepResult {
   at: number;
 }
 
-export async function sweepExpiredHolds(env: Env, now: number = Date.now()): Promise<SweepResult> {
+/**
+ * Only what the sweep actually needs. Deliberately not the generated `Env`:
+ * that types `HOLD_TTL_MINUTES` as the literal in wrangler.jsonc, which would
+ * make it impossible to test any other value — including the bad ones this
+ * must reject.
+ */
+export interface SweeperEnv {
+  DB: D1Database;
+  HOLD_TTL_MINUTES?: string;
+}
+
+export async function sweepExpiredHolds(env: SweeperEnv, now: number = Date.now()): Promise<SweepResult> {
   const ttl = Number(env.HOLD_TTL_MINUTES ?? "30");
   if (!Number.isFinite(ttl) || ttl <= 0) {
     throw new Error(`HOLD_TTL_MINUTES must be a positive number, got ${String(env.HOLD_TTL_MINUTES)}`);
