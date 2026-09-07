@@ -128,6 +128,10 @@ export const locations = sqliteTable("locations", {
   dropoffFeeMinor: integer("dropoff_fee_minor").notNull().default(0),
   isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  /** What the customer needs to know about the hand-over there — the airport has a whole paragraph. */
+  note: text("note"),
+  lat: real("lat"),
+  lng: real("lng"),
 });
 
 // ---------------------------------------------------------------------------

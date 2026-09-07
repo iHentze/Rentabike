@@ -89,7 +89,7 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
             <Card className="px-2 py-[6px]">
               <Row icon={<span className="text-[14px] font-bold">1</span>} iconTone="brand" title="We email your confirmation" sub={`Within a few minutes, to ${booking.customerEmail}, with directions to the shop.`} />
               <div className="hairline mx-[14px]" />
-              <Row icon={<span className="text-[14px] font-bold">2</span>} iconTone="brand" title={`${booking.pickupName ?? SHOP.address}, ${fmtLongDay(booking.startAt)} ${fmtTime(booking.startAt)}`} sub="Bring the code and something with your name on it. Ten minutes for fitting." />
+              <Row icon={<span className="text-[14px] font-bold">2</span>} iconTone="brand" title={`${booking.pickupName ?? SHOP.address}, ${fmtLongDay(booking.startAt)} ${fmtTime(booking.startAt)}`} sub={booking.pickupNote ?? "Bring the code and something with your name on it. Ten minutes for fitting."} />
               <div className="hairline mx-[14px]" />
               <Row icon={<span className="text-[14px] font-bold">3</span>} iconTone="brand" title={`Back to ${booking.dropoffName ?? booking.pickupName ?? SHOP.address} by ${fmtLongDay(booking.endAt)} ${fmtTime(booking.endAt)}`} sub={`Someone's there ${SHOP.hours}. Call ahead if you're late — it's fine.`} />
             </Card>
