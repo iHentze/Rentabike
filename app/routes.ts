@@ -4,4 +4,6 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   index("routes/home.tsx"),
   route("health", "routes/health.ts"),
+  // The server prices. There is no route that accepts a price from the client.
+  route("api/quote", "routes/api.quote.ts"),
 ] satisfies RouteConfig;
