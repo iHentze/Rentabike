@@ -5,7 +5,8 @@ import { Footer, Header, SHOP, Shell, TripStrip } from "~/components/site";
 import { Amount, Card, PillLink, Price, Tag, cx } from "~/components/ui";
 import { Availability, BikeImage, riderRange } from "~/components/bike-card";
 import { Check, Chevron } from "~/components/icons";
-import { readTrip, tripDays, tripHref } from "~/lib/trip";
+import { tripDays, tripHref } from "~/lib/trip";
+import { resolveTrip } from "~/lib/tour-trip";
 import { applyIntent, basketHeaders, nextRiderWithoutBike, readBasket, ridersOn } from "~/lib/basket";
 import { ADDON_UNIT_LABEL, CATEGORY_LABEL, getAddonsById, getBike } from "~/lib/catalogue/bikes";
 import { fmtDays } from "~/lib/format";
@@ -17,12 +18,13 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export async function loader({ context, request, params }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
   const bike = await getBike(env.DB, params.slug, trip);
   if (!bike) throw new Response("Not found", { status: 404 });
   const [addons, basket] = await Promise.all([getAddonsById(env.DB, bike.addonIds), readBasket(request, trip)]);
   return {
-    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit },
+    tour: tour ? { title: tour.title, slug: tour.slug } : null,
+    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
     days: tripDays(trip),
     bike,
     addons: [...addons.values()],
@@ -34,7 +36,7 @@ export async function loader({ context, request, params }: Route.LoaderArgs) {
 export async function action({ context, request, params }: Route.ActionArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip } = await resolveTrip(env.DB, url.searchParams);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const [bike, basket] = await Promise.all([getBike(env.DB, params.slug, trip), readBasket(request, trip)]);
@@ -44,8 +46,8 @@ export async function action({ context, request, params }: Route.ActionArgs) {
 }
 
 export default function BikeDetail({ loaderData }: Route.ComponentProps) {
-  const { trip: t, days, bike, addons, inBasket, nextRider } = loaderData;
-  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
+  const { tour, trip: t, days, bike, addons, inBasket, nextRider } = loaderData;
+  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const isExtra = bike.category === "extra";
   const canAdd = bike.free > 0 && (isExtra ? inBasket < bike.free : nextRider >= 0 && inBasket < bike.free);
   const here = tripHref(`/bikes/${bike.slug}`, trip);
@@ -53,7 +55,7 @@ export default function BikeDetail({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <Header />
-      <TripStrip trip={trip} />
+      <TripStrip trip={trip} tour={tour} />
 
       <Shell className="px-5 pb-12 pt-[26px] md:px-8">
         <Link to={tripHref("/bikes", trip)} className="inline-flex items-center gap-1 text-[14px] font-semibold text-brand-bright hover:text-ink">

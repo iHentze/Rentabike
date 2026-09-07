@@ -4,7 +4,8 @@ import { cloudflareContext } from "~/context";
 import { Footer, Header, Shell, TripStrip } from "~/components/site";
 import { Card, Lbl, PillLink, cx } from "~/components/ui";
 import { BikeCard } from "~/components/bike-card";
-import { readTrip, tripHref, tripParams } from "~/lib/trip";
+import { tripHref, tripParams } from "~/lib/trip";
+import { resolveTrip } from "~/lib/tour-trip";
 import { applyIntent, basketHeaders, nextRiderWithoutBike, readBasket, ridersOn } from "~/lib/basket";
 import { CATEGORY_LABEL, CATEGORY_ORDER, fitsRider, listBikes } from "~/lib/catalogue/bikes";
 import type { BikeCategory } from "~/db/schema";
@@ -21,8 +22,9 @@ const CATS = new Set<string>(CATEGORY_ORDER);
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
-  const [bikes, basket] = await Promise.all([listBikes(env.DB, trip), readBasket(request, trip)]);
+  const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
+  const [all, basket] = await Promise.all([listBikes(env.DB, trip), readBasket(request, trip)]);
+  const bikes = tour ? all.filter((b) => tour.allowedBikeTypeIds.includes(b.id) || b.category === "extra") : all;
 
   const cats = url.searchParams.getAll("cat").filter((c) => CATS.has(c)) as BikeCategory[];
   const heightRaw = Number.parseInt(url.searchParams.get("height") ?? "", 10);
@@ -47,7 +49,8 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
   return {
     here: url.pathname + url.search,
-    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit },
+    tour: tour ? { title: tour.title, slug: tour.slug } : null,
+    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
     days: tripDays(trip),
     bikes: shown,
     freeTotal: bikes.filter((b) => b.category !== "extra").reduce((n, b) => n + b.free, 0),
@@ -66,7 +69,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 export async function action({ context, request }: Route.ActionArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip } = await resolveTrip(env.DB, url.searchParams);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const bikeId = String(form.get("bike") ?? "");
@@ -78,8 +81,8 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Bikes({ loaderData }: Route.ComponentProps) {
-  const { here, trip: t, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
-  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
+  const { here, tour, trip: t, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
+  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const params = tripParams(trip);
   const allAssigned = nextRider < 0;
   const anyChosen = chosen.some((c) => c.name) || extras.length > 0;
@@ -87,7 +90,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <Header />
-      <TripStrip trip={trip} />
+      <TripStrip trip={trip} tour={tour} />
 
       <Shell className="grid gap-7 px-5 pb-10 pt-[26px] md:grid-cols-[226px_minmax(0,1fr)] md:px-8">
         {/* filters */}
@@ -131,7 +134,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
         <div className="flex flex-col gap-[18px]">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h1 className="font-display text-[28px] font-bold tracking-[-.022em]">
-              {freeTotal} bikes free on your dates
+              {tour ? `${freeTotal} bikes free for ${tour.title}` : `${freeTotal} bikes free on your dates`}
             </h1>
             <span className="text-[14.5px] text-ink-mute">Sorted by price · {fmtDays(days)}</span>
           </div>

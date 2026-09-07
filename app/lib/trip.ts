@@ -15,6 +15,8 @@ export interface Trip {
   riders: number;
   /** True when the URL carried dates; false when we fell back to defaults. */
   explicit: boolean;
+  /** Set when the dates are a tour departure's — see lib/tour-trip.ts. */
+  tourDepartureId?: string;
 }
 
 export const OPEN_FROM = "08:00";
@@ -64,7 +66,9 @@ export function readTrip(params: URLSearchParams, now: Date | number = Date.now(
 export function tripParams(trip: Trip, extra: Record<string, string | number | undefined> = {}): URLSearchParams {
   const s = faroeParts(trip.startAt);
   const e = faroeParts(trip.endAt);
-  const p = new URLSearchParams({ from: s.date, fromTime: s.time, to: e.date, toTime: e.time, riders: String(trip.riders) });
+  const p = trip.tourDepartureId
+    ? new URLSearchParams({ tour: trip.tourDepartureId, riders: String(trip.riders) })
+    : new URLSearchParams({ from: s.date, fromTime: s.time, to: e.date, toTime: e.time, riders: String(trip.riders) });
   for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "") p.set(k, String(v));
   return p;
 }

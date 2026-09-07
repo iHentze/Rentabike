@@ -17,6 +17,8 @@ export interface RailRider {
   totalMinor: number | null;
   /** Struck through — the bike went while the customer was typing. */
   lost?: boolean;
+  /** On a tour: the bike rides along at no charge. */
+  included?: boolean;
 }
 
 export interface RailLine {
@@ -62,7 +64,13 @@ export function SummaryRail({ title = "Your booking", days, riders, lines, total
                 <span className="text-[13.5px] font-semibold text-brand-bright">Pick a bike →</span>
               )}
             </div>
-            {r.totalMinor != null ? <Amount minor={r.totalMinor} className={cx("text-[14.5px]", r.lost && "text-ink-mute line-through")} /> : <span className="text-[14.5px] text-ink-dim">—</span>}
+            {r.included && r.bikeName ? (
+              <span className="text-[13.5px] font-semibold text-ok">Included</span>
+            ) : r.totalMinor != null ? (
+              <Amount minor={r.totalMinor} className={cx("text-[14.5px]", r.lost && "text-ink-mute line-through")} />
+            ) : (
+              <span className="text-[14.5px] text-ink-dim">—</span>
+            )}
           </div>
         ))}
         {lines.map((l, i) => (

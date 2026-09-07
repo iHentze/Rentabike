@@ -7,7 +7,7 @@ import { Link, NavLink } from "react-router";
 import type { ReactNode } from "react";
 import { Calendar, Chevron, Phone, Pin } from "./icons";
 import { cx } from "./ui";
-import { fmtRange } from "~/lib/format";
+import { fmtDayTime, fmtRange } from "~/lib/format";
 import type { Trip } from "~/lib/trip";
 import { tripDays, tripHref } from "~/lib/trip";
 import { plural, fmtDays } from "~/lib/format";
@@ -78,13 +78,13 @@ export function Header({ variant = "site", right }: { variant?: "site" | "funnel
 }
 
 /** "Fri 12 → Sun 14 June · 2 riders   Change" — the header's right side inside the funnel. */
-export function TripSummary({ trip, changeTo = "/" }: { trip: Trip; changeTo?: string }) {
+export function TripSummary({ trip, changeTo = "/", tour }: { trip: Trip; changeTo?: string; tour?: { title: string; slug: string } | null }) {
   return (
     <>
       <span className="num hidden text-[14.5px] text-ink-soft sm:inline">
-        {fmtRange(trip.startAt, trip.endAt)} · {plural(trip.riders, "rider")}
+        {tour ? `${tour.title} · ${fmtDayTime(trip.startAt)}` : fmtRange(trip.startAt, trip.endAt)} · {plural(trip.riders, "rider")}
       </span>
-      <Link to={tripHref(changeTo, trip)} className="text-[14.5px] font-semibold text-brand-bright hover:text-ink">
+      <Link to={tour ? `/tours/${tour.slug}?riders=${trip.riders}&dep=${trip.tourDepartureId ?? ""}` : tripHref(changeTo, trip)} className="text-[14.5px] font-semibold text-brand-bright hover:text-ink">
         Change
       </Link>
     </>
@@ -92,13 +92,13 @@ export function TripSummary({ trip, changeTo = "/" }: { trip: Trip; changeTo?: s
 }
 
 /** The blue strip under the header on the catalogue: dates, pickup, riders. */
-export function TripStrip({ trip }: { trip: Trip }) {
+export function TripStrip({ trip, tour }: { trip: Trip; tour?: { title: string; slug: string } | null }) {
   return (
     <div className="bg-brand/14">
       <Shell className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-[13px] md:px-8">
         <span className="inline-flex items-center gap-[9px] text-[14.5px] font-semibold">
           <Calendar size={17} className="text-brand-bright" />
-          <span className="num">{fmtRange(trip.startAt, trip.endAt)}</span>
+          <span className="num">{tour ? `${tour.title} · ${fmtDayTime(trip.startAt)}` : fmtRange(trip.startAt, trip.endAt)}</span>
         </span>
         <span className="inline-flex items-center gap-[9px] text-[14.5px] font-semibold">
           <Pin size={17} className="text-brand-bright" />
@@ -107,7 +107,7 @@ export function TripStrip({ trip }: { trip: Trip }) {
         <span className="text-[14.5px] text-ink-soft">
           {fmtDays(tripDays(trip))} · {plural(trip.riders, "rider")}
         </span>
-        <Link to={tripHref("/", trip)} className="ml-auto text-[14.5px] font-semibold text-brand-bright hover:text-ink">
+        <Link to={tour ? `/tours/${tour.slug}?riders=${trip.riders}&dep=${trip.tourDepartureId ?? ""}` : tripHref("/", trip)} className="ml-auto text-[14.5px] font-semibold text-brand-bright hover:text-ink">
           Change
         </Link>
       </Shell>
