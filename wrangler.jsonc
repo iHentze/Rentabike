@@ -10,6 +10,10 @@
     "not_found_handling": "none"
   },
 
+  // workers.dev is the only route until the rentabike.fo cutover.
+  "workers_dev": true,
+  "preview_urls": true,
+
   "observability": { "enabled": true },
 
   // D1 — the only database. Local dev uses a SQLite file under .wrangler/.
@@ -25,8 +29,9 @@
   // Rule B5: held bookings expire after 30 minutes. The sweeper runs every 5.
   "triggers": { "crons": ["*/5 * * * *"] },
 
+  // Deployed values. Local dev overrides these from .dev.vars (gitignored).
   "vars": {
-    "APP_ENV": "development",
+    "APP_ENV": "production",
     "HOLD_TTL_MINUTES": "30"
   }
 }
