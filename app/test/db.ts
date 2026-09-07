@@ -1,7 +1,12 @@
 import { env } from "cloudflare:test";
 // Vite inlines the generated migration at build time, so the DDL is available
 // inside workerd where there is no filesystem.
-import initSql from "../../drizzle/0000_init.sql?raw";
+// Every migration in drizzle/, in file order — the same set wrangler applies.
+const MIGRATIONS = import.meta.glob("../../drizzle/*.sql", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const initSql = Object.keys(MIGRATIONS)
+  .sort()
+  .map((k) => MIGRATIONS[k])
+  .join(`\n--> statement-breakpoint\n`);
 
 /** Drizzle separates statements with this marker. */
 const BREAK = "--> statement-breakpoint";

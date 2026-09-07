@@ -8,12 +8,13 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
+import { Footer, Header } from "./components/site";
 
 // Fonts are self-hosted static assets (see plan, revision 4). No third-party
 // request in the render path — the Porsche CDN outage is the lesson here.
 export const links: Route.LinksFunction = () => [
-  { rel: "preload", href: "/fonts/familjen-grotesk.woff2", as: "font", type: "font/woff2", crossOrigin: "anonymous" },
-  { rel: "preload", href: "/fonts/public-sans.woff2", as: "font", type: "font/woff2", crossOrigin: "anonymous" },
+  { rel: "preload", href: "/fonts/familjen-grotesk-latin.woff2", as: "font", type: "font/woff2", crossOrigin: "anonymous" },
+  { rel: "preload", href: "/fonts/public-sans-latin.woff2", as: "font", type: "font/woff2", crossOrigin: "anonymous" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -50,9 +51,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-24">
-      <h1 className="font-display text-3xl font-bold">{message}</h1>
-      <p className="mt-3 text-ink-soft">{details}</p>
-    </main>
+    <>
+      <Header />
+      <main className="mx-auto min-h-[50vh] max-w-2xl px-6 py-24">
+        <h1 className="font-display text-3xl font-bold">{message}</h1>
+        <p className="mt-3 text-ink-soft">{details}</p>
+        <a href="/" className="mt-6 inline-block text-[15px] font-semibold text-brand-bright hover:text-ink">
+          Back to the start ›
+        </a>
+      </main>
+      <Footer />
+    </>
   );
 }

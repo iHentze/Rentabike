@@ -13,9 +13,13 @@ export default {
     return requestHandler(request, context);
   },
 
-  // Rule B5: release held bookings whose payment never completed.
+  // Rule B5: release held bookings whose payment never completed — and keep
+  // the next 90 days of tour departures generated from the weekly schedules.
   async scheduled(_controller, env, ctx) {
-    const { sweepExpiredHolds } = await import("../app/lib/booking/sweeper");
-    ctx.waitUntil(sweepExpiredHolds(env));
+    const [{ sweepExpiredHolds }, { ensureDepartures }] = await Promise.all([
+      import("../app/lib/booking/sweeper"),
+      import("../app/lib/tours/ensure"),
+    ]);
+    ctx.waitUntil(Promise.all([sweepExpiredHolds(env), ensureDepartures(env.DB)]));
   },
 } satisfies ExportedHandler<Env>;

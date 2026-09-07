@@ -258,6 +258,8 @@ export const tours = sqliteTable(
     /** Rule F6: requires_bike with zero allowed bike types cannot publish. */
     requiresBike: integer("requires_bike", { mode: "boolean" }).notNull().default(false),
     image: text("image"),
+    // Short card facts, pipe-separated: "225 m pass | Paved throughout | E-bike, MTB or road".
+    facts: text("facts"),
     published: integer("published", { mode: "boolean" }).notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
