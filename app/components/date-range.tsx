@@ -80,6 +80,19 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
     };
   }, [open]);
 
+  // On a phone the sheet is fixed over the page, so freeze the page behind it: a tap that
+  // nudged the page would move the calendar with it, and the next tap landed on the wrong day.
+  useEffect(() => {
+    if (!open || !window.matchMedia("(max-width: 639px)").matches) return;
+    const y = window.scrollY;
+    const was = { position: document.body.style.position, top: document.body.style.top, width: document.body.style.width, overflow: document.body.style.overflow };
+    Object.assign(document.body.style, { position: "fixed", top: `-${y}px`, width: "100%", overflow: "hidden" });
+    return () => {
+      Object.assign(document.body.style, was);
+      window.scrollTo(0, y);
+    };
+  }, [open]);
+
   const show = (which: "from" | "to") => {
     setMonth((which === "from" ? range.from : range.to).slice(0, 7));
     setPhase(which);
@@ -119,8 +132,9 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
           </button>
         </div>
 
+        {open && <div className="fixed inset-0 z-20 bg-black/55 sm:hidden" onClick={() => setOpen(false)} aria-hidden="true" />}
         {open && (
-          <div role="dialog" aria-label="Choose your dates" className="absolute left-0 top-[calc(100%+8px)] z-30 w-[min(640px,calc(100vw-24px))] rounded-card bg-card p-4 shadow-[0_18px_60px_rgba(0,0,0,.55),inset_0_0_0_1px_rgba(255,255,255,.06)] max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:max-h-[calc(100dvh-16px)] max-sm:w-auto max-sm:overflow-y-auto">
+          <div role="dialog" aria-label="Choose your dates" className="absolute left-0 top-[calc(100%+8px)] z-30 w-[min(640px,calc(100vw-24px))] rounded-card bg-card p-4 shadow-[0_18px_60px_rgba(0,0,0,.55),inset_0_0_0_1px_rgba(255,255,255,.06)] max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:max-h-[calc(100dvh-16px)] max-sm:w-auto max-sm:overflow-y-auto max-sm:overscroll-contain">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-[14px] font-semibold text-ink-soft">{phase === "from" ? "Pick the first day" : phase === "to" ? "Now the last day" : "Set the times, then Done"}</span>
               <div className="flex items-center gap-1">

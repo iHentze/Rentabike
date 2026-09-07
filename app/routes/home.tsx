@@ -56,15 +56,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
       {/* hero: real customers on real bikes */}
       <section className="relative">
+        <div className="relative">
         <img
           src="/images/tour-adventure-mtb-light.jpg"
           alt="A rider pushing a mountain bike along a ridge above the valley, sun through the mist"
-          className="absolute inset-0 size-full object-cover"
-          style={{ objectPosition: "50% 58%" }}
+          className="absolute inset-0 size-full object-cover object-[68%_50%] md:object-[50%_58%]"
           fetchPriority="high"
         />
         <div className="absolute inset-x-0 bottom-0 h-[78%] bg-[linear-gradient(180deg,rgba(7,14,21,0)_0%,rgba(7,14,21,.42)_34%,rgba(7,14,21,.90)_74%,#070E15_100%)]" />
-        <Shell className="relative flex min-h-[560px] flex-col justify-between px-5 pb-[30px] pt-11 md:min-h-[620px] md:px-8">
+        <Shell className="relative flex min-h-[480px] flex-col justify-end px-5 pb-7 pt-11 md:min-h-[640px] md:justify-start md:pb-[210px] md:px-8">
           <div className="flex max-w-[660px] flex-col gap-[18px]">
             <span className="inline-flex items-center gap-2 self-start rounded-full bg-ground/50 px-4 py-2 text-[12.5px] font-bold tracking-[.08em]">
               <Pin size={14} strokeWidth={2.2} />
@@ -80,8 +80,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </p>
           </div>
 
-          {/* booking, in the hero, where it belongs */}
-          <form method="get" action="/bikes" className="mt-10 flex flex-col gap-1 rounded-card bg-[rgba(11,20,28,.92)] p-2">
+        </Shell>
+        </div>
+
+        {/* booking, right under the words — over the foot of the photo where there is room for it */}
+        <Shell className="relative px-5 pb-2 md:-mt-[180px] md:px-8">
+          <form method="get" action="/bikes" className="flex flex-col gap-1 rounded-card bg-[rgba(11,20,28,.92)] p-2 shadow-[0_18px_50px_rgba(0,0,0,.35)]">
             <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.1fr_1fr_1fr_.5fr]">
             <LocationCell label="Pick up" name="pickup" value={pickupId} locations={locations} fee="pickup" first />
             <LocationCell label="Return to" name="dropoff" value={dropoffId} locations={locations} fee="dropoff" />
