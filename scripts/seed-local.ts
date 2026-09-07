@@ -11,7 +11,10 @@
 import { readFileSync } from "node:fs";
 import { parseCatalogue } from "../app/db/seed/parse";
 
-const file = process.argv[2] ?? "data/woocommerce-products-2026-09-06.csv";
+// --compact collapses rate_tiers and bike_addons into multi-row inserts so the
+// whole seed fits through an API that takes one SQL string per call.
+const compact = process.argv.includes("--compact");
+const file = process.argv.find((a) => a.endsWith(".csv")) ?? "data/woocommerce-products-2026-09-06.csv";
 const cat = parseCatalogue(readFileSync(file, "utf8"));
 const now = Date.now();
 
@@ -19,6 +22,8 @@ const q = (v: string | number | null): string =>
   v === null ? "NULL" : typeof v === "number" ? String(v) : `'${v.replace(/'/g, "''")}'`;
 
 const out: string[] = [];
+const tierRows: string[] = [];
+const linkRows: string[] = [];
 
 for (const a of cat.addons.values()) {
   out.push(
@@ -35,16 +40,29 @@ for (const b of cat.bikeTypes) {
         .join(", ") +
       `) ON CONFLICT(id) DO UPDATE SET slug=excluded.slug, name=excluded.name, category=excluded.category, model=excluded.model, size_label=excluded.size_label, rider_min_cm=excluded.rider_min_cm, rider_max_cm=excluded.rider_max_cm, stock=excluded.stock, listed=excluded.listed, description=excluded.description, image=excluded.image, updated_at=excluded.updated_at;`,
   );
-  out.push(`DELETE FROM rate_tiers WHERE bike_type_id = ${q(b.id)};`);
+  if (!compact) out.push(`DELETE FROM rate_tiers WHERE bike_type_id = ${q(b.id)};`);
   for (const [i, band] of b.bands.entries()) {
     if (band.maxDays === null) throw new Error(`${b.id}: open-ended band cannot be a rate tier`);
-    out.push(
-      `INSERT INTO rate_tiers (id, bike_type_id, min_days, max_days, price_minor, per_day) VALUES (${q(`${b.id}-t${i + 1}`)}, ${q(b.id)}, ${band.minDays}, ${band.maxDays}, ${band.priceMinor}, ${band.perDay ? 1 : 0});`,
-    );
+    const row = `(${q(`${b.id}-t${i + 1}`)}, ${q(b.id)}, ${band.minDays}, ${band.maxDays}, ${band.priceMinor}, ${band.perDay ? 1 : 0})`;
+    if (compact) tierRows.push(row);
+    else out.push(`INSERT INTO rate_tiers (id, bike_type_id, min_days, max_days, price_minor, per_day) VALUES ${row};`);
   }
-  out.push(`DELETE FROM bike_addons WHERE bike_type_id = ${q(b.id)};`);
+  if (!compact) out.push(`DELETE FROM bike_addons WHERE bike_type_id = ${q(b.id)};`);
   for (const slug of b.addonSlugs) {
-    out.push(`INSERT OR IGNORE INTO bike_addons (bike_type_id, addon_id) VALUES (${q(b.id)}, ${q(`addon-${slug}`)});`);
+    const row = `(${q(b.id)}, ${q(`addon-${slug}`)})`;
+    if (compact) linkRows.push(row);
+    else out.push(`INSERT OR IGNORE INTO bike_addons (bike_type_id, addon_id) VALUES ${row};`);
+  }
+}
+
+if (compact) {
+  // Fresh load: clear once, then insert in batches of 60 rows per statement.
+  out.push(`DELETE FROM bike_addons;`, `DELETE FROM rate_tiers;`);
+  for (let i = 0; i < tierRows.length; i += 60) {
+    out.push(`INSERT INTO rate_tiers (id, bike_type_id, min_days, max_days, price_minor, per_day) VALUES ${tierRows.slice(i, i + 60).join(", ")};`);
+  }
+  for (let i = 0; i < linkRows.length; i += 60) {
+    out.push(`INSERT OR IGNORE INTO bike_addons (bike_type_id, addon_id) VALUES ${linkRows.slice(i, i + 60).join(", ")};`);
   }
 }
 

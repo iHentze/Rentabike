@@ -17,7 +17,7 @@
     {
       "binding": "DB",
       "database_name": "rentabike",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "5d5724f6-1faf-41dc-b243-9b1abda75dd3",
       "migrations_dir": "drizzle"
     }
   ],
