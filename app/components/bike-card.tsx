@@ -21,15 +21,17 @@ export function riderRange(b: Pick<CatalogueBike, "sizeLabel" | "riderMinCm" | "
 
 /**
  * A product photo on its plate. The shop's photos are white-background
- * cutouts, so they sit on a pale panel, scaled to fit and never blown up past
- * their own pixels — the source files are small. `src` picks one photo of the
+ * cutouts, so they sit on a white panel, scaled to fit and never blown up past
+ * their own pixels (object-fit: scale-down) — the source files are small. The
+ * image is positioned absolutely rather than sized in percent: Safari resolves
+ * a percentage max-height inside a flex box to nothing and drops the photo. `src` picks one photo of the
  * gallery; otherwise the main one. No photo at all draws the line-art bike.
  */
 export function BikeImage({ bike, src, eager, className }: { bike: Pick<CatalogueBike, "image" | "name" | "category">; src?: string | null; eager?: boolean; className?: string }) {
   const url = imageSrc(src ?? bike.image);
   return url ? (
-    <div className={cx("flex size-full items-center justify-center bg-white p-3", className)}>
-      <img src={url} alt="" loading={eager ? "eager" : "lazy"} className="max-h-full max-w-full object-contain" style={{ width: "auto", height: "auto" }} />
+    <div className={cx("relative size-full bg-white p-3", className)}>
+      <img src={url} alt="" loading={eager ? "eager" : "lazy"} className="absolute inset-0 size-full object-scale-down p-[inherit]" />
     </div>
   ) : (
     <div className={cx("flex size-full items-center justify-center bg-white/5 text-brand-bright", className)}>

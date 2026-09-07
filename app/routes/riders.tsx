@@ -417,7 +417,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                       <span className="rounded-full bg-warn/16 px-3 py-[5px] text-[12px] font-bold tracking-[.04em] text-warn">NOT INCLUDED WITH RENTALS</span>
                     )}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                     <Form method="post" action={here}>
                       <input type="hidden" name="intent" value="helmet" />
                       <input type="hidden" name="r" value={current} />
@@ -455,7 +455,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                   <span className="text-[13.5px] text-ink-mute">Only what fits this bike · prices for the whole rental</span>
                 </div>
                 {rest.length > 0 ? (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {rest.map((a) => (
                       <div key={a.id} className={cx("flex items-center gap-3 rounded-field px-[14px] py-[13px]", a.qty > 0 ? "bg-brand/18 shadow-[inset_0_0_0_1.5px_#0A78D6]" : "bg-white/5")}>
                         <div className="flex min-w-0 flex-1 flex-col gap-[2px]">

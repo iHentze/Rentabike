@@ -56,7 +56,9 @@ function monthGrid(ym: string): Array<string | null> {
 export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: string; to: string; fromTime: string; toTime: string; today: string }) {
   const [range, setRange] = useState({ from, to });
   const [times, setTimes] = useState({ from: fromTime, to: toTime });
-  const [open, setOpen] = useState<null | "from" | "to">(null);
+  const [open, setOpen] = useState(false);
+  // What the next tap means: the first day, the last day, or the times before Done.
+  const [phase, setPhase] = useState<"from" | "to" | "times">("from");
   const [month, setMonth] = useState(from.slice(0, 7));
   const [hover, setHover] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -65,10 +67,10 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(null);
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
     };
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(null);
+      if (e.key === "Escape") setOpen(false);
     };
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", key);
@@ -80,16 +82,18 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
 
   const show = (which: "from" | "to") => {
     setMonth((which === "from" ? range.from : range.to).slice(0, 7));
-    setOpen(which);
+    setPhase(which);
+    setOpen(true);
   };
 
+  // Two taps for the days; the popover stays put so the times can follow. Only Done closes it.
   const pick = (d: string) => {
-    if (open === "from" || d < range.from) {
+    if (phase === "from" || d < range.from) {
       setRange({ from: d, to: range.to < d ? d : range.to });
-      setOpen("to");
+      setPhase("to");
     } else {
       setRange({ ...range, to: d });
-      setOpen(null);
+      setPhase("times");
     }
   };
 
@@ -99,7 +103,7 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
   const returnSlots = sameDay ? OPENING_TIMES.filter((t) => t > times.from) : OPENING_TIMES;
   const toTimeShown = returnSlots.includes(times.to) ? times.to : (returnSlots[0] ?? times.to);
   // While picking the last day, the range previews up to the day under the pointer.
-  const previewTo = open === "to" && hover && hover >= range.from ? hover : range.to;
+  const previewTo = phase === "to" && hover && hover >= range.from ? hover : range.to;
 
   return (
     <div ref={box} className="contents">
@@ -110,21 +114,24 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
       <div className="relative flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
         <Lbl>From</Lbl>
         <div className="flex items-center gap-2 text-[16px] font-semibold">
-          <button type="button" onClick={() => show("from")} aria-haspopup="dialog" aria-expanded={open === "from"} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open === "from" && "text-brand-bright")}>
+          <button type="button" onClick={() => show("from")} aria-haspopup="dialog" aria-expanded={open} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open && phase === "from" && "text-brand-bright")}>
             {dayLabel(range.from)} <span className="text-ink-mute">·</span> {times.from}
           </button>
         </div>
 
         {open && (
-          <div role="dialog" aria-label="Choose your dates" className="absolute left-0 top-[calc(100%+8px)] z-30 w-[min(640px,calc(100vw-24px))] rounded-card bg-card p-4 max-sm:fixed max-sm:inset-x-3 max-sm:bottom-3 max-sm:top-auto max-sm:w-auto shadow-[0_18px_60px_rgba(0,0,0,.55),inset_0_0_0_1px_rgba(255,255,255,.06)]">
+          <div role="dialog" aria-label="Choose your dates" className="absolute left-0 top-[calc(100%+8px)] z-30 w-[min(640px,calc(100vw-24px))] rounded-card bg-card p-4 shadow-[0_18px_60px_rgba(0,0,0,.55),inset_0_0_0_1px_rgba(255,255,255,.06)] max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:max-h-[calc(100dvh-16px)] max-sm:w-auto max-sm:overflow-y-auto">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-[14px] font-semibold text-ink-soft">{open === "from" ? "Pick the first day" : "Now the last day"}</span>
+              <span className="text-[14px] font-semibold text-ink-soft">{phase === "from" ? "Pick the first day" : phase === "to" ? "Now the last day" : "Set the times, then Done"}</span>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => setMonth(addMonths(month, -1))} disabled={month <= firstMonth} aria-label="Earlier month" className="flex size-8 items-center justify-center rounded-full hover:bg-white/8 disabled:opacity-25">
                   <Chevron size={15} className="rotate-180" />
                 </button>
                 <button type="button" onClick={() => setMonth(addMonths(month, 1))} aria-label="Later month" className="flex size-8 items-center justify-center rounded-full hover:bg-white/8">
                   <Chevron size={15} />
+                </button>
+                <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="ml-1 flex size-8 items-center justify-center rounded-full bg-white/8 text-[18px] leading-none hover:bg-white/14 sm:hidden">
+                  ×
                 </button>
               </div>
             </div>
@@ -137,7 +144,7 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
             <div className="mt-4 grid gap-3 border-t border-white/6 pt-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
               <TimePick label="Collect" day={dayLabel(range.from)} value={times.from} slots={OPENING_TIMES} onChange={(t) => setTimes({ ...times, from: t })} />
               <TimePick label="Return" day={dayLabel(range.to)} value={toTimeShown} slots={returnSlots} onChange={(t) => setTimes({ ...times, to: t })} />
-              <button type="button" onClick={() => setOpen(null)} className="rounded-full bg-white px-[20px] py-[10px] text-[14px] font-bold text-night hover:bg-ink-pale">
+              <button type="button" onClick={() => setOpen(false)} className="rounded-full bg-white px-[20px] py-[10px] text-[14px] font-bold text-night hover:bg-ink-pale">
                 Done
               </button>
             </div>
@@ -147,7 +154,7 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
       <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
         <Lbl>Until</Lbl>
         <div className="flex items-center gap-2 text-[16px] font-semibold">
-          <button type="button" onClick={() => show("to")} aria-haspopup="dialog" aria-expanded={open === "to"} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open === "to" && "text-brand-bright")}>
+          <button type="button" onClick={() => show("to")} aria-haspopup="dialog" aria-expanded={open} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open && phase !== "from" && "text-brand-bright")}>
             {dayLabel(range.to)} <span className="text-ink-mute">·</span> {toTimeShown}
           </button>
         </div>
