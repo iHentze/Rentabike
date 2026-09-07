@@ -52,7 +52,7 @@ export function BikeCard({ bike, inBasket, href, action, disabled }: { bike: Cat
           {CATEGORY_LABEL[bike.category]}
         </Tag>
         {inBasket > 0 && (
-          <Tag className="absolute right-3 top-3">{isExtra ? `${inBasket} in basket` : inBasket === 1 ? "In basket" : `${inBasket} riders`}</Tag>
+          <Tag className="absolute right-3 top-3">{isExtra ? `${inBasket} in your booking` : inBasket === 1 ? "In your booking" : `${inBasket} riders`}</Tag>
         )}
       </Link>
       <div className="flex flex-1 flex-col gap-[11px] px-4 pb-4 pt-[15px]">
