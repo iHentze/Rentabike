@@ -32,7 +32,7 @@ export function BikeImage({ bike, className }: { bike: Pick<CatalogueBike, "imag
  * A product card on the catalogue: photo, category, name, fit, availability,
  * price per day for these dates, and Add — or the stepper once it is in.
  */
-export function BikeCard({ bike, inBasket, href, disabled }: { bike: CatalogueBike; inBasket: number; href: string; disabled?: boolean }) {
+export function BikeCard({ bike, inBasket, href, action, disabled }: { bike: CatalogueBike; inBasket: number; href: string; action: string; disabled?: boolean }) {
   const isExtra = bike.category === "extra";
   return (
     <div className={cx("flex flex-col overflow-hidden rounded-card bg-card", inBasket > 0 && "shadow-[inset_0_0_0_2px_#0A78D6]", bike.free <= 0 && "opacity-70")}>
@@ -60,7 +60,7 @@ export function BikeCard({ bike, inBasket, href, disabled }: { bike: CatalogueBi
           {bike.free <= 0 ? (
             <span className="text-[13px] text-ink-dim">Unavailable</span>
           ) : inBasket > 0 ? (
-            <Form method="post" className="flex items-center gap-[11px] rounded-full bg-white/8 px-3 py-[6px]">
+            <Form method="post" action={action} className="flex items-center gap-[11px] rounded-full bg-white/8 px-3 py-[6px]">
               <input type="hidden" name="bike" value={bike.id} />
               <button name="intent" value="remove" aria-label={`Remove one ${bike.name}`} className="rounded-full p-1 hover:bg-white/10">
                 <Minus size={13} />
@@ -71,7 +71,7 @@ export function BikeCard({ bike, inBasket, href, disabled }: { bike: CatalogueBi
               </button>
             </Form>
           ) : (
-            <Form method="post">
+            <Form method="post" action={action}>
               <input type="hidden" name="bike" value={bike.id} />
               <button name="intent" value="add" disabled={disabled} className="rounded-full bg-white px-[18px] py-2 text-[14px] font-bold text-night hover:bg-ink-pale disabled:cursor-not-allowed disabled:bg-white/7 disabled:text-ink-dim">
                 Add

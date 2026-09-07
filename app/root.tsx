@@ -13,6 +13,7 @@ import { Footer, Header } from "./components/site";
 // Fonts are self-hosted static assets (see plan, revision 4). No third-party
 // request in the render path — the Porsche CDN outage is the lesson here.
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
   { rel: "preload", href: "/fonts/familjen-grotesk-latin.woff2", as: "font", type: "font/woff2", crossOrigin: "anonymous" },
   { rel: "preload", href: "/fonts/public-sans-latin.woff2", as: "font", type: "font/woff2", crossOrigin: "anonymous" },
 ];

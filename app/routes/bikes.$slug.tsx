@@ -48,6 +48,7 @@ export default function BikeDetail({ loaderData }: Route.ComponentProps) {
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
   const isExtra = bike.category === "extra";
   const canAdd = bike.free > 0 && (isExtra ? inBasket < bike.free : nextRider >= 0 && inBasket < bike.free);
+  const here = tripHref(`/bikes/${bike.slug}`, trip);
 
   return (
     <>
@@ -168,7 +169,7 @@ export default function BikeDetail({ loaderData }: Route.ComponentProps) {
               </div>
             )}
 
-            <Form method="post" className="flex flex-col gap-[10px]">
+            <Form method="post" action={here} className="flex flex-col gap-[10px]">
               <input type="hidden" name="next" value={tripHref("/bikes", trip)} />
               {canAdd ? (
                 <button name="intent" value="add" className="w-full rounded-full bg-white px-6 py-[15px] text-[16px] font-bold text-night hover:bg-ink-pale">

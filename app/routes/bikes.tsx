@@ -32,14 +32,21 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   for (const b of bikes) if (b.free > 0) counts[b.category]++;
 
   let shown = bikes.filter((b) => (cats.length === 0 || cats.includes(b.category)) && fitsRider(b, height));
-  // Free first, then cheapest, then name — the sold-out ones stay visible, at the end.
-  shown = shown.sort((a, b) => Number(b.free > 0) - Number(a.free > 0) || a.rateMinor - b.rateMinor || a.name.localeCompare(b.name));
+  // Bikes before extras, free before sold out, then cheapest — the sold-out ones stay visible, at the end.
+  shown = shown.sort(
+    (a, b) =>
+      Number(a.category === "extra") - Number(b.category === "extra") ||
+      Number(b.free > 0) - Number(a.free > 0) ||
+      a.rateMinor - b.rateMinor ||
+      a.name.localeCompare(b.name),
+  );
 
   const chosen = basket.riders.map((r, i) => ({ i, bike: r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) ?? null : null }));
   const extras = Object.entries(basket.extras).map(([id, qty]) => ({ bike: bikes.find((b) => b.id === id) ?? null, qty }));
   const soFar = chosen.reduce((n, c) => n + (c.bike?.tripMinor ?? 0), 0) + extras.reduce((n, e) => n + (e.bike ? e.bike.tripMinor * e.qty : 0), 0);
 
   return {
+    here: url.pathname + url.search,
     trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit },
     days: tripDays(trip),
     bikes: shown,
@@ -71,7 +78,7 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Bikes({ loaderData }: Route.ComponentProps) {
-  const { trip: t, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
+  const { here, trip: t, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
   const params = tripParams(trip);
   const allAssigned = nextRider < 0;
@@ -84,7 +91,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
 
       <Shell className="grid gap-7 px-5 pb-10 pt-[26px] md:grid-cols-[226px_minmax(0,1fr)] md:px-8">
         {/* filters */}
-        <Form method="get" className="flex flex-col gap-[22px] self-start rounded-card bg-card p-[18px]">
+        <Form method="get" action="/bikes" className="flex flex-col gap-[22px] self-start rounded-card bg-card p-[18px]">
           {[...params.entries()].map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v} />
           ))}
@@ -133,7 +140,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {bikes.map((b) => (
-                <BikeCard key={b.id} bike={b} inBasket={inBasket[b.id] ?? 0} href={tripHref(`/bikes/${b.slug}`, trip)} disabled={b.category !== "extra" && allAssigned && !(inBasket[b.id] ?? 0)} />
+                <BikeCard key={b.id} bike={b} inBasket={inBasket[b.id] ?? 0} href={tripHref(`/bikes/${b.slug}`, trip)} action={here} disabled={b.category !== "extra" && allAssigned && !(inBasket[b.id] ?? 0)} />
               ))}
             </div>
           )}
