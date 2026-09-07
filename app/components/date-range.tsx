@@ -8,8 +8,8 @@
  * All date arithmetic is on YYYY-MM-DD strings via UTC, so the server and the
  * browser render byte-identical markup whatever timezone either sits in.
  */
-import { useEffect, useRef, useState } from "react";
-import { Chevron, ChevronDown } from "./icons";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Calendar, Chevron, ChevronDown } from "./icons";
 import { Lbl, cx } from "./ui";
 import { OPENING_TIMES } from "~/lib/trip";
 
@@ -124,13 +124,10 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
       <input type="hidden" name="to" value={range.to} />
       <input type="hidden" name="fromTime" value={times.from} />
       <input type="hidden" name="toTime" value={toTimeShown} />
-      <div className="relative flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
-        <Lbl>From</Lbl>
-        <div className="flex items-center gap-2 text-[16px] font-semibold">
-          <button type="button" onClick={() => show("from")} aria-haspopup="dialog" aria-expanded={open} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open && phase === "from" && "text-brand-bright")}>
-            {dayLabel(range.from)} <span className="text-ink-mute">·</span> {times.from}
-          </button>
-        </div>
+      <div className="relative">
+        <Cell label="From" active={open && phase === "from"} onOpen={() => show("from")} expanded={open}>
+          {dayLabel(range.from)} <span className="text-ink-mute">·</span> {times.from}
+        </Cell>
 
         {open && <div className="fixed inset-0 z-20 bg-black/55 sm:hidden" onClick={() => setOpen(false)} aria-hidden="true" />}
         {open && (
@@ -165,14 +162,9 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
-        <Lbl>Until</Lbl>
-        <div className="flex items-center gap-2 text-[16px] font-semibold">
-          <button type="button" onClick={() => show("to")} aria-haspopup="dialog" aria-expanded={open} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open && phase !== "from" && "text-brand-bright")}>
-            {dayLabel(range.to)} <span className="text-ink-mute">·</span> {toTimeShown}
-          </button>
-        </div>
-      </div>
+      <Cell label="Until" active={open && phase !== "from"} onOpen={() => show("to")} expanded={open}>
+        {dayLabel(range.to)} <span className="text-ink-mute">·</span> {toTimeShown}
+      </Cell>
     </div>
   );
 }
@@ -222,6 +214,28 @@ function Month({ ym, today, from, to, onPick, onHover, className }: { ym: string
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * One cell of the bar. The whole cell is the button — nobody should have to
+ * hit the words — and a calendar mark at the edge says what a tap does.
+ */
+function Cell({ label, active, expanded, onOpen, children }: { label: string; active: boolean; expanded: boolean; onOpen: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-haspopup="dialog"
+      aria-expanded={expanded}
+      className={cx("flex w-full items-center gap-3 px-[18px] py-[14px] text-left transition-colors hover:bg-white/5 active:bg-white/8 max-lg:border-t max-lg:border-white/7 lg:border-l lg:border-white/7", active && "bg-brand/12")}
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <Lbl>{label}</Lbl>
+        <span className={cx("num truncate text-[16px] font-semibold", active && "text-brand-bright")}>{children}</span>
+      </span>
+      <Calendar size={18} className={cx("shrink-0", active ? "text-brand-bright" : "text-ink-mute")} />
+    </button>
   );
 }
 
