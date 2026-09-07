@@ -5,7 +5,8 @@ import { Footer, Header, SHOP, Shell, TripSummary } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
 import { BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
-import { Check, Info, Minus, Plus } from "~/components/icons";
+import { Check, Info } from "~/components/icons";
+import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
 import { basketHeaders, nextRiderWithoutBike, readBasket, riderLabel, ridersOn } from "~/lib/basket";
@@ -18,7 +19,7 @@ export function meta(_: Route.MetaArgs) {
   return [{ title: "A bike for each rider — Rent a Bike & Outdoor" }];
 }
 
-const HELMET = "addon-helmet-for-rent";
+const HELMET = HELMET_ID;
 
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
@@ -69,7 +70,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
       return { label: riderLabel(basket, i), name: r.name ?? "", heightCm: r.heightCm ?? null, bikeName: bike?.name ?? null, bikeSize: bike?.sizeLabel ?? null, rateMinor: bike?.rateMinor ?? null, perDay: bike?.perDay ?? true, totalMinor: priced.riderTotals[i] ?? null };
     }),
     candidates: candidates.map((b) => ({ id: b.id, slug: b.slug, name: b.name, category: b.category, image: b.image, sizeLabel: b.sizeLabel, riderMinCm: b.riderMinCm, riderMaxCm: b.riderMaxCm, free: b.freeForRider, rateMinor: b.rateMinor, perDay: b.perDay, mine: rider.bikeTypeId === b.id, ranged: b.ranged })),
-    addons: addons.map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, qty: basket.addons[a.id] ?? 0 })),
+    addons: addons.map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 })),
     extras: Object.entries(basket.extras).map(([id, qty]) => ({ id, name: bikes.find((b) => b.id === id)?.name ?? id, qty, totalMinor: (bikes.find((b) => b.id === id)?.tripMinor ?? 0) * qty })),
     fees: priced.quote?.lines.filter((l) => l.kind === "fee").map((l) => ({ label: l.label, totalMinor: l.lineTotalMinor })) ?? [],
     addonLines: priced.quote?.lines.filter((l) => l.kind === "addon").map((l) => ({ label: `${l.label}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.lineTotalMinor })) ?? [],
@@ -263,36 +264,9 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
           </div>
 
           {/* extras */}
-          <Card className="flex flex-col gap-[15px] px-[22px] py-5">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-[19px] font-semibold tracking-[-.012em]">Anything else{riders.length > 1 ? ` for the ${riders.length} of you` : ""}?</h2>
-              {tour ? <span className="text-[13.5px] font-semibold text-ok">Helmets included</span> : helmets && <span className="num text-[13.5px] font-semibold text-ok">Helmet {formatDKKCode(helmets.priceMinor)} per bike</span>}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {addons.map((a) => (
-                <div key={a.id} className={cx("flex items-center gap-3 rounded-field px-[15px] py-[14px]", a.qty > 0 ? "bg-brand/18 shadow-[inset_0_0_0_1.5px_#0A78D6]" : "bg-white/5")}>
-                  <div className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                    <span className="truncate text-[14.5px] font-semibold">{a.name}</span>
-                    <span className={cx("num text-[12.5px]", a.qty > 0 ? "font-semibold text-brand-bright" : "text-ink-mute")}>
-                      {formatDKKCode(a.priceMinor)} {a.unit === "per_booking" ? "per booking" : a.unit === "per_bike_per_day" ? "per bike per day" : "per bike"}
-                      {a.qty > 0 && ` · ${a.qty} added`}
-                    </span>
-                  </div>
-                  <Form method="post" action={here} className="flex shrink-0 items-center gap-1">
-                    <input type="hidden" name="intent" value="addon" />
-                    <input type="hidden" name="addon" value={a.id} />
-                    <input type="hidden" name="r" value={current} />
-                    <button name="delta" value="-1" aria-label={`Remove ${a.name}`} disabled={a.qty === 0} className="flex size-8 items-center justify-center rounded-full bg-white/8 hover:bg-white/14 disabled:opacity-30">
-                      <Minus size={13} />
-                    </button>
-                    <button name="delta" value="1" aria-label={`Add ${a.name}`} disabled={a.unit === "per_booking" && a.qty > 0} className="flex size-8 items-center justify-center rounded-full bg-white/8 hover:bg-white/14 disabled:opacity-30">
-                      <Plus size={13} />
-                    </button>
-                  </Form>
-                </div>
-              ))}
-            </div>
-            <span className="text-[13px] text-ink-mute">
+          <Card className="px-[22px] py-5">
+            <AddonsPanel addons={addons} action={here} riders={riders.length} helmetsIncluded={Boolean(tour)} hidden={{ r: current }} />
+            <span className="mt-4 block text-[13px] text-ink-mute">
               Child seats, trailers and pedals for your own bike are on the{" "}
               <Link to={tripHref("/bikes", trip, { cat: "extra" })} className="font-semibold text-brand-bright hover:text-ink">
                 extras list

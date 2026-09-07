@@ -5,8 +5,21 @@ import { Footer, Header, SHOP, Shell } from "~/components/site";
 import { Card, Lbl, Tag, cx } from "~/components/ui";
 import { Check, Info, Minus, Plus } from "~/components/icons";
 import { getTour } from "~/lib/tours/catalogue";
-import { fmtDuration, fmtLongDay, fmtTime } from "~/lib/format";
+import { faroeParts, fmtDuration, fmtLongDay, fmtTime } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
+import { wallClock } from "~/lib/trip";
+import { ChevronDown } from "~/components/icons";
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** "2026-11" → the Faroese-clock bounds of that month, plus its neighbours. */
+function monthWindow(month: string) {
+  const [y = 2026, m = 1] = month.split("-").map(Number);
+  const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  return { from: wallClock(`${month}-01`, "00:00").getTime(), to: wallClock(`${next}-01`, "00:00").getTime(), next, prev, label: `${MONTHS[m - 1]} ${y}` };
+}
 
 export function meta({ loaderData }: Route.MetaArgs) {
   return [
@@ -17,12 +30,17 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 export async function loader({ context, params, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
-  const tour = await getTour(env.DB, params.slug);
-  if (!tour) throw new Response("Not found", { status: 404 });
   const url = new URL(request.url);
+  const monthParam = url.searchParams.get("month") ?? "";
+  const month = MONTH_RE.test(monthParam) ? monthWindow(monthParam) : null;
+  const tour = await getTour(env.DB, params.slug, Date.now(), 6, month ?? undefined);
+  if (!tour) throw new Response("Not found", { status: 404 });
   const riders = Math.min(tour.capacity ?? 8, Math.max(1, Number.parseInt(url.searchParams.get("riders") ?? "2", 10) || 2));
   const chosen = url.searchParams.get("dep") ?? tour.departures.find((d) => d.bookable)?.id ?? null;
-  return { tour, riders, chosen };
+  // Where "later dates" starts: the month after the last departure shown.
+  const last = tour.departures[tour.departures.length - 1];
+  const laterMonth = last ? monthWindow(faroeParts(last.startsAt).date.slice(0, 7)).next : monthWindow(faroeParts(Date.now()).date.slice(0, 7)).next;
+  return { tour, riders, chosen, month: month ? { label: month.label, prev: month.prev, next: month.next, key: monthParam } : null, laterMonth };
 }
 
 /** "Choose your bikes" / "Book": carry the departure and party size into the funnel. */
@@ -38,7 +56,8 @@ export async function action({ context, request, params }: Route.ActionArgs) {
 }
 
 export default function TourDetail({ loaderData }: Route.ComponentProps) {
-  const { tour, riders, chosen } = loaderData;
+  const { tour, riders, chosen, month, laterMonth } = loaderData;
+  const withMonth = (m: string | null) => `?riders=${riders}${m ? `&month=${m}` : ""}`;
   const dep = tour.departures.find((d) => d.id === chosen) ?? null;
   const unit = dep?.priceMinor ?? tour.priceMinor;
   const total = unit * riders;
@@ -129,9 +148,19 @@ export default function TourDetail({ loaderData }: Route.ComponentProps) {
             </div>
 
             <div className="flex flex-col gap-[10px]">
-              <Lbl>{tour.weekday ? `Next ${tour.weekday}s` : "Next departures"}</Lbl>
+              <div className="flex items-center justify-between">
+                <Lbl>{month ? month.label : tour.weekday ? `Next ${tour.weekday}s` : "Next departures"}</Lbl>
+                {month && (
+                  <span className="flex items-center gap-3 text-[13px] font-semibold">
+                    <Link to={withMonth(month.prev)} preventScrollReset className="text-brand-bright hover:text-ink">‹ Earlier</Link>
+                    <Link to={withMonth(month.next)} preventScrollReset className="text-brand-bright hover:text-ink">Later ›</Link>
+                  </span>
+                )}
+              </div>
               {tour.departures.length === 0 ? (
-                <span className="text-[14px] leading-[1.5] text-ink-soft">No dates on sale right now — call {SHOP.phone} and we'll find one.</span>
+                <span className="text-[14px] leading-[1.5] text-ink-soft">
+                  {month ? `Nothing on sale in ${month.label} yet — dates open about a year ahead. Call ${SHOP.phone} for further out.` : `No dates on sale right now — call ${SHOP.phone} and we'll find one.`}
+                </span>
               ) : (
                 <div className="flex flex-col gap-2">
                   {tour.departures.map((d) => {
@@ -153,11 +182,16 @@ export default function TourDetail({ loaderData }: Route.ComponentProps) {
                     return full || closed ? (
                       <div key={d.id} className={cls}>{body}</div>
                     ) : (
-                      <Link key={d.id} to={`?riders=${riders}&dep=${d.id}`} className={cls} preventScrollReset>
+                      <Link key={d.id} to={`?riders=${riders}&dep=${d.id}${month ? `&month=${month.key}` : ""}`} className={cls} preventScrollReset>
                         {body}
                       </Link>
                     );
                   })}
+                  {!month && (
+                    <Link to={withMonth(laterMonth)} preventScrollReset className="inline-flex items-center justify-center gap-1 rounded-field bg-white/5 px-[15px] py-[11px] text-[14px] font-semibold text-brand-bright hover:bg-white/8 hover:text-ink">
+                      Later dates <ChevronDown size={14} />
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

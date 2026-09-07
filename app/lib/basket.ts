@@ -47,6 +47,8 @@ export async function readBasket(request: Request, trip: Trip): Promise<Basket> 
   };
   while (basket.riders.length < trip.riders) basket.riders.push({});
   basket.riders.length = trip.riders;
+  if (!basket.pickupLocationId && trip.pickupLocationId) basket.pickupLocationId = trip.pickupLocationId;
+  if (!basket.dropoffLocationId && trip.dropoffLocationId) basket.dropoffLocationId = trip.dropoffLocationId;
   return basket;
 }
 
@@ -75,6 +77,11 @@ function cleanCounts(v: unknown): Record<string, number> {
     if (typeof n === "number" && Number.isInteger(n) && n > 0 && n <= 20) out[k] = n;
   }
   return out;
+}
+
+/** Nothing but helmets and bags — the customer has their own bike. */
+export function ownBikeOnly(basket: Basket): boolean {
+  return basket.riders.every((r) => !r.bikeTypeId) && (Object.keys(basket.addons).length > 0 || Object.keys(basket.extras).length > 0);
 }
 
 /** How many riders are on a given bike type. */

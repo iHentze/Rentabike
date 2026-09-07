@@ -1,6 +1,7 @@
 /**
  * Keep departures rolling forward. Runs from the cron alongside the hold
- * sweeper: every active schedule is expanded for the next `horizonDays` and
+ * sweeper: every active schedule is expanded for the next `horizonDays`
+ * (a bit over a year — visitors book summer in the previous autumn) and
  * inserted with INSERT OR IGNORE, so this is safe to run every five minutes
  * and the customer always sees the next few weeks on a tour page.
  */
@@ -20,7 +21,7 @@ interface ScheduleRow {
   duration_min: number;
 }
 
-export async function ensureDepartures(d1: D1Database, now: number = Date.now(), horizonDays = 90): Promise<number> {
+export async function ensureDepartures(d1: D1Database, now: number = Date.now(), horizonDays = 400): Promise<number> {
   const rows = await d1
     .prepare(
       `SELECT s.id, s.tour_id, s.season_start, s.season_end, s.weekday_mask, s.start_time, s.capacity, s.price_minor, t.duration_min

@@ -134,17 +134,26 @@ export async function listTours(d1: D1Database, now: number = Date.now()): Promi
 }
 
 /** One tour with its next departures (open or not — sold-out ones stay visible, struck through). */
-export async function getTour(d1: D1Database, slug: string, now: number = Date.now(), limit = 6): Promise<TourDetail | null> {
+export async function getTour(
+  d1: D1Database,
+  slug: string,
+  now: number = Date.now(),
+  limit = 6,
+  /** Restrict the departures to [from, to) — a calendar month, usually. */
+  window?: { from: number; to: number },
+): Promise<TourDetail | null> {
   const row = await d1.prepare(`${TOUR_SELECT} WHERE t.slug = ?1`).bind(slug).first<TourRow>();
   if (!row) return null;
+  const from = Math.max(now, window?.from ?? now);
+  const to = window?.to ?? Number.MAX_SAFE_INTEGER;
   const [deps, incl, bikes] = await Promise.all([
     d1
       .prepare(
         `SELECT id, tour_id, starts_at, ends_at, capacity, seats_taken, price_minor, min_participants, status
-           FROM tour_departures WHERE tour_id = ?1 AND is_private = 0 AND starts_at > ?2 AND status IN ('open','closed')
+           FROM tour_departures WHERE tour_id = ?1 AND is_private = 0 AND starts_at > ?2 AND starts_at < ?4 AND status IN ('open','closed')
           ORDER BY starts_at LIMIT ?3`,
       )
-      .bind(row.id, now, limit)
+      .bind(row.id, from, window ? 40 : limit, to)
       .all<DepartureRow>(),
     d1.prepare(`SELECT label, included FROM tour_inclusions WHERE tour_id = ?1 ORDER BY seq`).bind(row.id).all<{ label: string; included: number }>(),
     d1.prepare(`SELECT bike_type_id FROM tour_bike_types WHERE tour_id = ?1`).bind(row.id).all<{ bike_type_id: string }>(),
