@@ -1,33 +1,14 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import {
-  getComponentChunkLinks,
-  getFontFaceStyles,
-  getFontLinks,
-  getIconLinks,
-  getInitialStyles,
-  getMetaTagsAndIconLinks,
-} from '@porsche-design-system/components-react/partials';
-
-const transformIndexHtmlPlugin = () => {
-  return {
-    name: 'html-transform',
-    transformIndexHtml(html: string) {
-      const headPartials = [
-        getInitialStyles(),
-        getFontFaceStyles(),
-        getFontLinks({ weights: ['regular', 'semi-bold', 'bold'] }),
-        getComponentChunkLinks(),
-        getIconLinks(),
-        getMetaTagsAndIconLinks({ appTitle: 'RentABike.fo' }),
-      ].join('');
-
-      return html.replace(/<\/head>/, `${headPartials}</head>`);
-    },
-  };
-};
+import { reactRouter } from "@react-router/dev/vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), transformIndexHtmlPlugin()],
+  plugins: [
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
+    tailwindcss(),
+    reactRouter(),
+    tsconfigPaths(),
+  ],
 });

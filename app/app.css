@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Design tokens — from the canvas. Ground/card/text/brand/status. */
+@theme {
+  --color-ground: #070e15;
+  --color-card: #131c25;
+  --color-ink: #ffffff;
+  --color-ink-soft: #9bb0c2;
+  --color-ink-mute: #6b8399;
+  --color-brand: #0a78d6;
+  --color-brand-bright: #4fa6e8;
+  --color-brand-plaque: #0070bb;
+  --color-ok: #2ed47a;
+  --color-warn: #ffb020;
+  --color-danger: #ff6b5a;
+
+  --font-display: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 20px;
+}
+
+/* Self-hosted faces. Files land in public/fonts/ in Phase 3. */
+@font-face {
+  font-family: "Familjen Grotesk";
+  src: url("/fonts/familjen-grotesk.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Public Sans";
+  src: url("/fonts/public-sans.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+html { color-scheme: dark; }

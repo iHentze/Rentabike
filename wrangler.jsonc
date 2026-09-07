@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rentabike",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./build/client",
+    "not_found_handling": "none"
+  },
+
+  "observability": { "enabled": true },
+
+  // D1 — the only database. Local dev uses a SQLite file under .wrangler/.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rentabike",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ],
+
+  // Rule B5: held bookings expire after 30 minutes. The sweeper runs every 5.
+  "triggers": { "crons": ["*/5 * * * *"] },
+
+  "vars": {
+    "APP_ENV": "development",
+    "HOLD_TTL_MINUTES": "30"
+  }
+}
