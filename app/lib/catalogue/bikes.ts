@@ -25,6 +25,8 @@ export interface CatalogueBike {
   stock: number;
   free: number;
   image: string | null;
+  /** Every photo, main first. Empty when the shop has none. */
+  images: string[];
   description: string | null;
   tiers: QuoteTier[];
   /** Per-day rate for this trip's length, or the period total for Extra items priced that way. */
@@ -57,6 +59,7 @@ interface BikeRow {
   stock: number;
   free: number;
   image: string | null;
+  images: string | null;
   description: string | null;
 }
 
@@ -80,7 +83,7 @@ const AVAILABILITY = `
        AND b.end_at > ?1), 0) AS free`;
 
 const COLUMNS = `bt.id, bt.slug, bt.name, bt.category, bt.model, bt.size_label, bt.rider_min_cm, bt.rider_max_cm,
-  bt.stock, bt.image, bt.description`;
+  bt.stock, bt.image, bt.images, bt.description`;
 
 /** Every listed product, priced and counted for the trip. */
 export async function listBikes(d1: D1Database, trip: Trip): Promise<CatalogueBike[]> {
@@ -170,6 +173,7 @@ function assemble(rows: BikeRow[], tierRows: TierRow[], linkRows: { bike_type_id
       stock: r.stock,
       free: Math.max(0, r.free),
       image: r.image,
+      images: parseImages(r.images, r.image),
       description: r.description,
       tiers,
       rateMinor: tier.priceMinor,
@@ -179,6 +183,19 @@ function assemble(rows: BikeRow[], tierRows: TierRow[], linkRows: { bike_type_id
     });
   }
   return out;
+}
+
+/** The stored JSON list, or just the main photo for rows seeded before the column existed. */
+function parseImages(json: string | null, main: string | null): string[] {
+  if (json) {
+    try {
+      const list = JSON.parse(json);
+      if (Array.isArray(list) && list.every((u) => typeof u === "string")) return list;
+    } catch {
+      // fall through to the single image
+    }
+  }
+  return main ? [main] : [];
 }
 
 /** True when a rider of this height fits the frame. Products without a range fit everyone. */

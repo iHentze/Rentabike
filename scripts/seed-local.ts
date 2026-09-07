@@ -34,11 +34,11 @@ for (const a of cat.addons.values()) {
 
 for (const b of cat.bikeTypes) {
   out.push(
-    `INSERT INTO bike_types (id, slug, name, category, model, size_label, rider_min_cm, rider_max_cm, stock, listed, description, image, wc_product_id, created_at, updated_at) VALUES (` +
-      [b.id, b.slug, b.name, b.category, b.model, b.sizeLabel, b.riderMinCm, b.riderMaxCm, b.stock, b.listed ? 1 : 0, b.description, b.image, b.wcProductId, now, now]
+    `INSERT INTO bike_types (id, slug, name, category, model, size_label, rider_min_cm, rider_max_cm, stock, listed, description, image, images, wc_product_id, created_at, updated_at) VALUES (` +
+      [b.id, b.slug, b.name, b.category, b.model, b.sizeLabel, b.riderMinCm, b.riderMaxCm, b.stock, b.listed ? 1 : 0, b.description, b.image, JSON.stringify(b.images), b.wcProductId, now, now]
         .map(q)
         .join(", ") +
-      `) ON CONFLICT(id) DO UPDATE SET slug=excluded.slug, name=excluded.name, category=excluded.category, model=excluded.model, size_label=excluded.size_label, rider_min_cm=excluded.rider_min_cm, rider_max_cm=excluded.rider_max_cm, stock=excluded.stock, listed=excluded.listed, description=excluded.description, image=excluded.image, updated_at=excluded.updated_at;`,
+      `) ON CONFLICT(id) DO UPDATE SET slug=excluded.slug, name=excluded.name, category=excluded.category, model=excluded.model, size_label=excluded.size_label, rider_min_cm=excluded.rider_min_cm, rider_max_cm=excluded.rider_max_cm, stock=excluded.stock, listed=excluded.listed, description=excluded.description, image=excluded.image, images=excluded.images, updated_at=excluded.updated_at;`,
   );
   if (!compact) out.push(`DELETE FROM rate_tiers WHERE bike_type_id = ${q(b.id)};`);
   for (const [i, band] of b.bands.entries()) {
@@ -66,11 +66,19 @@ if (compact) {
   }
 }
 
-// The shop's own address as the default location, plus the campsite drop-off
-// the canvas designs against. Fees from the design; confirm with the shop.
+// The shop's own address as the default location, plus the delivery points
+// the shop delivers to. The list comes from the product page; the rest of it
+// is added when rentabike.fo can be read from here.
 out.push(
-  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('shop', 'sverrisgota-20', 'Sverrisgøta 20', 'Sverrisgøta 20, FO-100 Tórshavn', 0, 0, 1, 1);`,
-  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('campsite', 'vid-gjonna', 'Við Gjónna', 'Við Gjónna campsite, Tórshavn', 15000, 15000, 0, 1);`,
+  // Pickup and drop-off points as the shop's own product page lists them
+  // (fee per booking; drop-off assumed to match pickup until the site says otherwise).
+  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('shop', 'sverrisgota-20', 'Sverrisgøta 20', 'Rent a Bike, Sverrisgøta 20, FO-100 Tórshavn', 0, 0, 1, 1);`,
+  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('leynar', 'leynar', 'Leynar', 'Leynar', 22500, 22500, 0, 1);`,
+  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('oyrabakka', 'oyrabakka', 'Oyrabakka', 'Oyrabakka', 35000, 35000, 0, 1);`,
+  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('leirvik', 'leirvik', 'Leirvík', 'Leirvík', 55000, 55000, 0, 1);`,
+  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('klaksvik', 'klaksvik', 'Klaksvík', 'Klaksvík', 59000, 59000, 0, 1);`,
+  `INSERT OR IGNORE INTO locations (id, slug, name, address, pickup_fee_minor, dropoff_fee_minor, is_default, active) VALUES ('norddepil', 'norddepil', 'Norðdepil', 'Norðdepil', 69000, 69000, 0, 1);`,
+  `UPDATE locations SET active = 0 WHERE id = 'campsite';`,
 );
 
 process.stdout.write(out.join("\n") + "\n");

@@ -18,9 +18,18 @@ export function riderRange(b: Pick<CatalogueBike, "sizeLabel" | "riderMinCm" | "
   return parts.join(" · ");
 }
 
-export function BikeImage({ bike, className }: { bike: Pick<CatalogueBike, "image" | "name" | "category">; className?: string }) {
-  return bike.image ? (
-    <img src={bike.image} alt="" loading="lazy" className={cx("size-full object-cover", className)} />
+/**
+ * A product photo on its plate. The shop's photos are white-background
+ * cutouts, so they sit on a pale panel, scaled to fit and never blown up past
+ * their own pixels — the source files are small. `src` picks one photo of the
+ * gallery; otherwise the main one. No photo at all draws the line-art bike.
+ */
+export function BikeImage({ bike, src, eager, className }: { bike: Pick<CatalogueBike, "image" | "name" | "category">; src?: string | null; eager?: boolean; className?: string }) {
+  const url = src ?? bike.image;
+  return url ? (
+    <div className={cx("flex size-full items-center justify-center bg-white p-3", className)}>
+      <img src={url} alt="" loading={eager ? "eager" : "lazy"} className="max-h-full max-w-full object-contain" style={{ width: "auto", height: "auto" }} />
+    </div>
   ) : (
     <div className={cx("flex size-full items-center justify-center bg-white/5 text-brand-bright", className)}>
       <BikeArt motor={bike.category === "ebike"} className="h-[70%] opacity-85" />

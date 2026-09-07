@@ -51,6 +51,8 @@ export const bikeTypes = sqliteTable(
     listed: integer("listed", { mode: "boolean" }).notNull().default(true),
     description: text("description"),
     image: text("image"),
+    /** Every product photo from the shop, JSON array of URLs, main first. */
+    images: text("images"),
     /** WooCommerce product id — kept for migration and reconciliation only. */
     wcProductId: integer("wc_product_id"),
     createdAt: createdAt(),

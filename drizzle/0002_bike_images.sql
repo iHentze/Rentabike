@@ -1,0 +1,1 @@
+ALTER TABLE `bike_types` ADD `images` text;
