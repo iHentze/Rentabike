@@ -1,11 +1,12 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { cloudflareContext } from "~/context";
 import { DateRangeCells } from "~/components/date-range";
 import { Footer, Header, SHOP, Shell } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Row, Tag, cx } from "~/components/ui";
-import { Bag, Bolt, CardIcon, Chevron, Child, Gravel, Mountain, Pin, Road, Shield } from "~/components/icons";
-import { readTrip, tripDays, tripHref, type Trip } from "~/lib/trip";
+import { Bag, Bolt, CardIcon, Chevron, ChevronDown, Child, Gravel, Mountain, Pin, Road, Shield } from "~/components/icons";
+import { MAX_RIDERS, readTrip, tripDays, tripHref, type Trip } from "~/lib/trip";
 import { faroeParts, fmtDuration } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
 import { listBikes, ridable, summariseCategories } from "~/lib/catalogue/bikes";
@@ -90,16 +91,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <LocationCell label="Pick up" name="pickup" value={pickupId} locations={locations} fee="pickup" first />
             <LocationCell label="Return to" name="dropoff" value={dropoffId} locations={locations} fee="dropoff" />
             <DateRangeCells from={start.date} to={end.date} fromTime={start.time} toTime={end.time} today={today} />
-            <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
-              <Lbl>Riders</Lbl>
-              <select name="riders" defaultValue={trip.riders} className="num -ml-1 bg-transparent text-[16px] font-semibold focus:outline-none">
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n} className="bg-card">
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <MenuCell label="Riders" name="riders" value={String(trip.riders)} options={Array.from({ length: MAX_RIDERS }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-[18px] border-t border-white/7 px-[18px] py-[10px]">
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -234,19 +226,34 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
 /** Where the bikes are collected or returned. Anywhere but the shop carries a fee; it says so in the option. */
 function LocationCell({ label, name, value, locations, fee, first }: { label: string; name: string; value: string; locations: Array<{ id: string; name: string; pickupFeeMinor: number; dropoffFeeMinor: number }>; fee: "pickup" | "dropoff"; first?: boolean }) {
+  const options = locations.map((l) => {
+    const f = fee === "pickup" ? l.pickupFeeMinor : l.dropoffFeeMinor;
+    return { value: l.id, label: `${l.name}${f > 0 ? ` · +${formatDKKCode(f)}` : ""}` };
+  });
+  return <MenuCell label={label} name={name} value={value} options={options} first={first} />;
+}
+
+/**
+ * A cell with a native menu behind it. The <select> is invisible and covers
+ * the whole cell, so a tap anywhere in the cell — the label, the empty space,
+ * the chevron — opens the menu; the words on top only show what is chosen.
+ */
+function MenuCell({ label, name, value, options, first }: { label: string; name: string; value: string; options: Array<{ value: string; label: string }>; first?: boolean }) {
+  const [current, setCurrent] = useState(value);
+  const shown = options.find((o) => o.value === current)?.label ?? options[0]?.label ?? "";
   return (
-    <div className={cx("flex flex-col gap-1 px-[18px] py-[14px]", !first && "lg:border-l lg:border-white/7")}>
-      <Lbl>{label}</Lbl>
-      <select name={name} defaultValue={value} className="-ml-1 max-w-full bg-transparent text-[16px] font-semibold focus:outline-none">
-        {locations.map((l) => {
-          const f = fee === "pickup" ? l.pickupFeeMinor : l.dropoffFeeMinor;
-          return (
-            <option key={l.id} value={l.id} className="bg-card">
-              {l.name}
-              {f > 0 ? ` · +${formatDKKCode(f)}` : ""}
-            </option>
-          );
-        })}
+    <div className={cx("relative flex items-center gap-3 px-[18px] py-[14px] transition-colors hover:bg-white/5", !first && "max-lg:border-t max-lg:border-white/7 lg:border-l lg:border-white/7")}>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <Lbl>{label}</Lbl>
+        <span className="truncate text-[16px] font-semibold">{shown}</span>
+      </span>
+      <ChevronDown size={16} className="shrink-0 text-ink-mute" />
+      <select name={name} value={current} onChange={(e) => setCurrent(e.target.value)} aria-label={label} className="absolute inset-0 size-full cursor-pointer opacity-0">
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-card">
+            {o.label}
+          </option>
+        ))}
       </select>
     </div>
   );
