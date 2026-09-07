@@ -6,7 +6,8 @@ import { Card, Lbl, Note, PillLink, cx } from "~/components/ui";
 import { BikeImage } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Shield, Warning } from "~/components/icons";
-import { readTrip, tripDays, tripHref } from "~/lib/trip";
+import { tripDays, tripHref } from "~/lib/trip";
+import { resolveTrip } from "~/lib/tour-trip";
 import { basketHeaders, clearBasketHeaders, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
 import { fitsRider, getBikesById, listBikes } from "~/lib/catalogue/bikes";
 import { priceBasket } from "~/lib/quote-basket";
@@ -24,13 +25,18 @@ export function meta(_: Route.MetaArgs) {
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
   const basket = await readBasket(request, trip);
   const [bikes, locations] = await Promise.all([listBikes(env.DB, trip), listLocations(env.DB)]);
   const shop = locations.find((l) => l.isDefault) ?? locations[0];
   if (!basket.pickupLocationId && shop) basket.pickupLocationId = shop.id;
   if (!basket.dropoffLocationId) basket.dropoffLocationId = basket.pickupLocationId;
-  const priced = await priceBasket(env.DB, trip, basket);
+  if (tour && shop) {
+    // Tours leave from and return to the shop; no location fees apply.
+    basket.pickupLocationId = shop.id;
+    basket.dropoffLocationId = shop.id;
+  }
+  const priced = await priceBasket(env.DB, trip, basket, tour);
 
   // The recovery panel: a bike went between choosing and paying.
   const lostId = url.searchParams.get("lost");
@@ -46,7 +52,9 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     : [];
 
   return {
-    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit },
+    tour: tour ? { title: tour.title, slug: tour.slug, requiresBike: tour.requiresBike, priceMinor: tour.priceMinor, seatsLeft: tour.seatsLeft, bookable: tour.bookable } : null,
+    seatLine: priced.quote?.lines.find((l) => l.kind === "tour_seat") ?? null,
+    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
     days: tripDays(trip),
     deadline: freeCancellationDeadline(trip.startAt).getTime(),
     locations: locations.map((l) => ({ id: l.id, name: l.name, dropoffFeeMinor: l.dropoffFeeMinor, pickupFeeMinor: l.pickupFeeMinor })),
@@ -61,7 +69,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     addonLines: priced.quote?.lines.filter((l) => l.kind === "addon").map((l) => ({ label: `${l.label}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.lineTotalMinor })) ?? [],
     fees: priced.quote?.lines.filter((l) => l.kind === "fee").map((l) => ({ label: l.label, totalMinor: l.lineTotalMinor })) ?? [],
     totalMinor: priced.quote?.totalMinor ?? 0,
-    ready: basket.riders.length > 0 && basket.riders.every((r) => r.bikeTypeId) && priced.quote !== null,
+    ready: basket.riders.length > 0 && (tour && !tour.requiresBike ? tour.bookable && trip.riders <= tour.seatsLeft : basket.riders.every((r) => r.bikeTypeId)) && priced.quote !== null && (!tour || (tour.bookable && trip.riders <= tour.seatsLeft)),
     lost: lost ? { id: lost.id, name: lost.name, rider: Number.isFinite(lostRider) ? lostRider : null, riderLabel: Number.isFinite(lostRider) ? riderLabel(basket, lostRider) : null, tripMinor: lost.tripMinor } : null,
     alternatives,
     error: url.searchParams.get("error"),
@@ -71,7 +79,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 export async function action({ context, request }: Route.ActionArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "book");
   const basket = await readBasket(request, trip);
@@ -108,14 +116,16 @@ export async function action({ context, request }: Route.ActionArgs) {
   const headers = await basketHeaders(basket);
 
   if (name.length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return redirect(back({ error: "details" }), { headers });
-  if (basket.riders.length === 0 || basket.riders.some((r) => !r.bikeTypeId)) return redirect(back({ error: "bikes" }), { headers });
+  const needBikes = !tour || tour.requiresBike;
+  if (basket.riders.length === 0 || (needBikes && basket.riders.some((r) => !r.bikeTypeId))) return redirect(back({ error: "bikes" }), { headers });
+  if (tour && (!tour.bookable || trip.riders > tour.seatsLeft)) return redirect(back({ error: "seats" }), { headers });
 
   const attempt = async (b: Basket) => {
-    const priced = await priceBasket(env.DB, trip, b);
+    const priced = await priceBasket(env.DB, trip, b, tour);
     if (!priced.quote) return { ok: false as const, reason: "sold_out" as const, unavailable: [] as string[] };
     return reserveBooking(env.DB, {
       quote: priced.quote,
-      kind: "rental",
+      kind: tour ? "tour" : "rental",
       startAt: trip.startAt,
       endAt: trip.endAt,
       customerName: name,
@@ -125,6 +135,8 @@ export async function action({ context, request }: Route.ActionArgs) {
       dropoffLocationId: b.dropoffLocationId,
       channel: "web",
       notes: notes || undefined,
+      tourDepartureId: tour?.departureId,
+      seats: tour ? trip.riders : undefined,
       holdTtlMinutes: Number(env.HOLD_TTL_MINUTES) || undefined,
     });
   };
@@ -166,8 +178,8 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Checkout({ loaderData }: Route.ComponentProps) {
-  const { trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error } = loaderData;
-  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
+  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error } = loaderData;
+  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const here = tripHref("/checkout", trip);
   const dropoff = locations.find((l) => l.id === dropoffId);
   const differentReturn = dropoffId && dropoffId !== pickupId;
@@ -264,6 +276,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
           )}
 
           {error === "details" && <Note icon={<Warning size={17} />}>We need a name and a working email address — that's where the confirmation and pickup code go.</Note>}
+          {error === "seats" && <Note icon={<Warning size={17} />}>That departure can't take {trip.riders} more — pick another date on the tour page.</Note>}
           {error === "bikes" && (
             <Note icon={<Warning size={17} />}>
               Every rider needs a bike before we can hold them.{" "}
@@ -294,6 +307,15 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
               </div>
             </Card>
 
+            {tour ? (
+              <Card className="flex items-center gap-[14px] px-[22px] py-5">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand-bright"><Calendar size={21} /></div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[16px] font-semibold">{tour.title} · {fmtLongDay(trip.startAt)} {fmtTime(trip.startAt)}</span>
+                  <span className="text-[14.5px] leading-[1.5] text-ink-soft">Meet at {SHOP.address} ten minutes before. {tour.requiresBike ? "Bikes and helmets are fitted at the shop." : "We drive from the shop and bring you back."}</span>
+                </div>
+              </Card>
+            ) : (
             <Card className="flex flex-col gap-4 p-[22px]">
               <h2 className="text-[20px] font-semibold tracking-[-.014em]">Pickup and drop-off</h2>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -333,6 +355,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
                 Update
               </button>
             </Card>
+            )}
 
             <Card className="flex items-center gap-[14px] px-[22px] py-5">
               <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ok/16 text-ok"><Shield size={21} /></div>
@@ -375,25 +398,25 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
 
         <div className="flex flex-col gap-[14px] lg:sticky lg:top-6">
           <SummaryRail
-            title="Your booking"
+            title={tour ? "Your tour" : "Your booking"}
             days={days}
-            riders={riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, detail: r.bikeName && r.rateMinor != null ? [r.range, r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)].filter(Boolean).join(" · ") : null, totalMinor: r.totalMinor, lost: r.lost }))}
-            lines={[...extras, ...addonLines, ...fees]}
+            riders={tour && !tour.requiresBike ? [] : riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, included: Boolean(tour), detail: tour ? (r.bikeName ? "Bike and helmet" : null) : r.bikeName && r.rateMinor != null ? [r.range, r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)].filter(Boolean).join(" · ") : null, totalMinor: r.totalMinor, lost: r.lost }))}
+            lines={[...(seatLine ? [{ label: `${seatLine.qty} × ${formatDKKCode(seatLine.unitPriceMinor)} · ${seatLine.label}`, totalMinor: seatLine.lineTotalMinor }] : []), ...extras, ...addonLines, ...fees]}
             totalMinor={totalMinor}
             totalLabel="Total"
             totalNote="Priced on our server, not your browser"
           />
           <div className="flex flex-col gap-1 text-[13.5px] text-ink-soft">
-            <span className="font-semibold">{fmtDayTime(trip.startAt)} → {fmtDayTime(trip.endAt)}</span>
-            <span>{plural(trip.riders, "rider")} · {days} {days === 1 ? "day" : "days"}</span>
+            <span className="font-semibold">{tour ? `${tour.title} · ${fmtDayTime(trip.startAt)}` : `${fmtDayTime(trip.startAt)} → ${fmtDayTime(trip.endAt)}`}</span>
+            <span>{tour ? plural(trip.riders, tour.requiresBike ? "rider" : "person", tour.requiresBike ? "riders" : "people") : `${plural(trip.riders, "rider")} · ${days} ${days === 1 ? "day" : "days"}`}</span>
           </div>
           {ready ? (
             <button form="checkout" name="intent" value="book" className="rounded-full bg-white px-6 py-4 text-[16.5px] font-bold text-night hover:bg-ink-pale">
               Book — pay {formatDKKCode(totalMinor)} at the shop
             </button>
           ) : (
-            <PillLink to={tripHref("/riders", trip)} tone="ghost" size="lg" block>
-              Finish choosing bikes first
+            <PillLink to={tour && !tour.requiresBike ? `/tours/${tour.slug}` : tripHref("/riders", trip)} tone="ghost" size="lg" block>
+              {tour && !tour.requiresBike ? "That date is not available" : "Finish choosing bikes first"}
             </PillLink>
           )}
           <div className="flex flex-col gap-[9px] px-1">

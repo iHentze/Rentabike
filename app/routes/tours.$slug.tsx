@@ -26,12 +26,15 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
 }
 
 /** "Choose your bikes" / "Book": carry the departure and party size into the funnel. */
-export async function action({ request, params }: Route.ActionArgs) {
+export async function action({ context, request, params }: Route.ActionArgs) {
+  const { env } = context.get(cloudflareContext);
   const form = await request.formData();
   const dep = String(form.get("dep") ?? "");
   const riders = Math.max(1, Number.parseInt(String(form.get("riders") ?? "1"), 10) || 1);
   if (!dep) return redirect(`/tours/${params.slug}`);
-  return redirect(`/riders?tour=${encodeURIComponent(dep)}&riders=${riders}`);
+  const tour = await getTour(env.DB, params.slug);
+  const target = tour?.requiresBike ? "/riders" : "/checkout";
+  return redirect(`${target}?tour=${encodeURIComponent(dep)}&riders=${riders}`);
 }
 
 export default function TourDetail({ loaderData }: Route.ComponentProps) {

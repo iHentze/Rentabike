@@ -6,7 +6,8 @@
 
 export const FAROE_TZ = "Atlantic/Faroe";
 
-const parts = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: FAROE_TZ, ...opts });
+// "en" rather than "en-GB": the pieces are assembled by hand below, and en-GB abbreviates September as "Sept".
+const parts = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en", { timeZone: FAROE_TZ, ...opts });
 const dayFmt = parts({ weekday: "short", day: "numeric", month: "short" });
 const longDayFmt = parts({ weekday: "long", day: "numeric", month: "long" });
 const timeFmt = parts({ hour: "2-digit", minute: "2-digit", hour12: false });

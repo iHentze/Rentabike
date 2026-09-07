@@ -6,7 +6,8 @@ import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
 import { BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { Check, Info, Minus, Plus } from "~/components/icons";
-import { readTrip, tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
+import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
+import { resolveTrip } from "~/lib/tour-trip";
 import { basketHeaders, nextRiderWithoutBike, readBasket, riderLabel, ridersOn } from "~/lib/basket";
 import { fitsRider, getAddonsById, listBikes, ridable } from "~/lib/catalogue/bikes";
 import { priceBasket } from "~/lib/quote-basket";
@@ -22,9 +23,9 @@ const HELMET = "addon-helmet-for-rent";
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
   const [bikes, basket] = await Promise.all([listBikes(env.DB, trip), readBasket(request, trip)]);
-  const fleet = ridable(bikes);
+  const fleet = tour ? ridable(bikes).filter((b) => tour.allowedBikeTypeIds.includes(b.id)) : ridable(bikes);
 
   const rParam = Number.parseInt(url.searchParams.get("r") ?? "", 10);
   const firstOpen = nextRiderWithoutBike(basket);
@@ -51,13 +52,15 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   const addonIds = new Set<string>(chosenBikes.flatMap((b) => b.addonIds));
   if (chosenBikes.length === 0) addonIds.add(HELMET);
   for (const id of Object.keys(basket.addons)) addonIds.add(id);
+  if (tour) addonIds.delete(HELMET); // helmets come with every guided ride
   const addons = [...(await getAddonsById(env.DB, [...addonIds])).values()].sort((a, b) => (a.id === HELMET ? -1 : b.id === HELMET ? 1 : a.priceMinor - b.priceMinor));
 
-  const priced = await priceBasket(env.DB, trip, basket);
+  const priced = await priceBasket(env.DB, trip, basket, tour);
   const days = tripDays(trip);
 
   return {
-    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit },
+    tour: tour ? { title: tour.title, slug: tour.slug, priceMinor: tour.priceMinor } : null,
+    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
     days,
     current,
     showAll,
@@ -70,6 +73,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     extras: Object.entries(basket.extras).map(([id, qty]) => ({ id, name: bikes.find((b) => b.id === id)?.name ?? id, qty, totalMinor: (bikes.find((b) => b.id === id)?.tripMinor ?? 0) * qty })),
     fees: priced.quote?.lines.filter((l) => l.kind === "fee").map((l) => ({ label: l.label, totalMinor: l.lineTotalMinor })) ?? [],
     addonLines: priced.quote?.lines.filter((l) => l.kind === "addon").map((l) => ({ label: `${l.label}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.lineTotalMinor })) ?? [],
+    seatLine: priced.quote?.lines.find((l) => l.kind === "tour_seat") ?? null,
     totalMinor: priced.quote?.totalMinor ?? 0,
     allAssigned: nextRiderWithoutBike(basket) < 0,
   };
@@ -78,7 +82,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 export async function action({ context, request }: Route.ActionArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
-  const trip = readTrip(url.searchParams);
+  const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const r = Number.parseInt(String(form.get("r") ?? ""), 10);
@@ -99,7 +103,7 @@ export async function action({ context, request }: Route.ActionArgs) {
   } else if (intent === "give" && rider) {
     const bikeId = String(form.get("bike") ?? "");
     const bike = (await listBikes(env.DB, trip)).find((b) => b.id === bikeId);
-    if (bike && bike.category !== "extra") {
+    if (bike && bike.category !== "extra" && (!tour || tour.allowedBikeTypeIds.includes(bike.id))) {
       const others = ridersOn(basket, bike.id) - (rider.bikeTypeId === bike.id ? 1 : 0);
       if (others < bike.free) rider.bikeTypeId = bike.id;
     }
@@ -127,8 +131,8 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Riders({ loaderData }: Route.ComponentProps) {
-  const { trip: t, days, current, showAll, riders, candidates, addons, extras, fees, addonLines, totalMinor, allAssigned } = loaderData;
-  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
+  const { tour, trip: t, days, current, showAll, riders, candidates, addons, extras, fees, addonLines, seatLine, totalMinor, allAssigned } = loaderData;
+  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const me = riders[current]!;
   const here = tripHref("/riders", trip, { r: current + 1, all: showAll ? 1 : undefined });
   const fits = candidates.filter((c) => c.free > 0);
@@ -136,7 +140,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <Header variant="funnel" right={<TripSummary trip={trip} />} />
+      <Header variant="funnel" right={<TripSummary trip={trip} tour={tour} />} />
 
       {/* rider tabs */}
       <div className="border-t border-white/5 bg-header">
@@ -234,7 +238,9 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     </div>
                     <div className={cx("flex items-center justify-between px-[15px] py-3", !gone && "bg-white/4")}>
                       {gone ? (
-                        <span className="text-[13px] text-ink-dim">Try other dates</span>
+                        <span className="text-[13px] text-ink-dim">{tour ? "None left that day" : "Try other dates"}</span>
+                      ) : tour ? (
+                        <span className="text-[14px] font-semibold text-ok">Included in the tour</span>
                       ) : (
                         <Price minor={b.rateMinor} per={b.perDay ? "/day" : "period"} size="sm" />
                       )}
@@ -260,7 +266,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
           <Card className="flex flex-col gap-[15px] px-[22px] py-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-[19px] font-semibold tracking-[-.012em]">Anything else{riders.length > 1 ? ` for the ${riders.length} of you` : ""}?</h2>
-              {helmets && <span className="num text-[13.5px] font-semibold text-ok">Helmet {formatDKKCode(helmets.priceMinor)} per bike</span>}
+              {tour ? <span className="text-[13.5px] font-semibold text-ok">Helmets included</span> : helmets && <span className="num text-[13.5px] font-semibold text-ok">Helmet {formatDKKCode(helmets.priceMinor)} per bike</span>}
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {addons.map((a) => (
@@ -299,15 +305,15 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
         {/* summary */}
         <div className="flex flex-col gap-[14px] lg:sticky lg:top-6">
           <SummaryRail
-            title={riders.length === 1 ? "Your bike" : `Your ${riders.length === 2 ? "two" : riders.length} bikes`}
+            title={tour ? "Your tour" : riders.length === 1 ? "Your bike" : `Your ${riders.length === 2 ? "two" : riders.length} bikes`}
             days={days}
-            riders={riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, detail: r.bikeName && r.rateMinor != null ? (r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)) : null, totalMinor: r.totalMinor }))}
-            lines={[...extras.map((e) => ({ label: `${e.name} ×${e.qty}`, totalMinor: e.totalMinor })), ...addonLines, ...fees]}
+            riders={riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, included: Boolean(tour), detail: tour ? (r.bikeName ? "Bike and helmet" : null) : r.bikeName && r.rateMinor != null ? (r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)) : null, totalMinor: r.totalMinor }))}
+            lines={[...(seatLine ? [{ label: `${seatLine.qty} × ${formatDKKCode(seatLine.unitPriceMinor)} · ${seatLine.label}`, totalMinor: seatLine.lineTotalMinor }] : []), ...extras.map((e) => ({ label: `${e.name} ×${e.qty}`, totalMinor: e.totalMinor })), ...addonLines, ...fees]}
             totalMinor={totalMinor}
             totalNote={allAssigned ? "Priced on our server, not your browser" : `${riders.filter((r) => !r.bikeName).length === 1 ? "One bike" : `${riders.filter((r) => !r.bikeName).length} bikes`} still to pick`}
             footer={
               <span>
-                Collect at {SHOP.address}, {fmtLongDay(trip.startAt)} {fmtTime(trip.startAt)}. Ten minutes to fit {riders.length === 1 ? "the bike" : "the bikes"}.
+                {tour ? "Meet" : "Collect"} at {SHOP.address}, {fmtLongDay(trip.startAt)} {fmtTime(trip.startAt)}. Ten minutes to fit {riders.length === 1 ? "the bike" : "the bikes"}.
               </span>
             }
           >
