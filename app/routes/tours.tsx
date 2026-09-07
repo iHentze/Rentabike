@@ -48,7 +48,7 @@ export default function Tours({ loaderData }: Route.ComponentProps) {
 
       {/* hero */}
       <section className="relative h-[320px] overflow-hidden">
-        <img src="/images/tour-nordadalsskard.jpg" alt="Guests riding to Norðadalsskarð" className="absolute inset-0 size-full object-cover" style={{ objectPosition: "50% 58%" }} />
+        <img src="/images/tour-kirkjubour.jpg" alt="The road into Kirkjubøur, grass roofs and the sound behind" className="absolute inset-0 size-full object-cover" style={{ objectPosition: "50% 55%" }} />
         <div className="absolute inset-x-0 bottom-0 h-[82%] bg-[linear-gradient(180deg,rgba(7,14,21,0)_0%,rgba(7,14,21,.5)_34%,rgba(7,14,21,.94)_80%,#070E15_100%)]" />
         <Shell className="relative flex h-full flex-col justify-end gap-4 px-5 pb-7 md:flex-row md:items-end md:justify-between md:px-8">
           <div className="flex max-w-[660px] flex-col gap-3">

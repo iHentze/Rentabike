@@ -55,10 +55,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       {/* hero: real customers on real bikes */}
       <section className="relative overflow-hidden">
         <img
-          src="/images/tour-nordadalsskard.jpg"
-          alt="Guests riding to Norðadalsskarð past the wind turbines"
+          src="/images/tour-adventure-mtb-light.jpg"
+          alt="A rider pushing a mountain bike along a ridge above the valley, sun through the mist"
           className="absolute inset-0 size-full object-cover"
-          style={{ objectPosition: "50% 62%" }}
+          style={{ objectPosition: "50% 58%" }}
           fetchPriority="high"
         />
         <div className="absolute inset-x-0 bottom-0 h-[78%] bg-[linear-gradient(180deg,rgba(7,14,21,0)_0%,rgba(7,14,21,.42)_34%,rgba(7,14,21,.90)_74%,#070E15_100%)]" />
@@ -214,7 +214,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
         {/* practical */}
         <Card className="px-2 py-[6px]">
-          <Row icon={<Pin size={20} />} title={`${SHOP.address}, open ${SHOP.hours} daily`} sub="Sverrisgøta 20 and Við Gjónna campsite. Drop off at either." right={<Chevron size={17} className="text-ink-dim" />} />
+          <Row icon={<Pin size={20} />} title={`${SHOP.address}, open ${SHOP.hours} daily`} sub="Collect at the shop, or have the bikes brought to Leynar, Oyrabakka, Leirvík, Klaksvík or Norðdepil for a fee." right={<Chevron size={17} className="text-ink-dim" />} />
           <div className="hairline mx-[14px]" />
           <Row icon={<Shield size={20} />} iconTone="ok" title="If the weather cancels a ride, you get everything back" sub="We check the forecast the evening before and call you by 20:00." right={<Chevron size={17} className="text-ink-dim" />} />
           <div className="hairline mx-[14px]" />
@@ -227,7 +227,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   );
 }
 
-/** Where the bikes are collected or returned. The campsite carries a fee; it says so in the option. */
+/** Where the bikes are collected or returned. Anywhere but the shop carries a fee; it says so in the option. */
 function LocationCell({ label, name, value, locations, fee, first }: { label: string; name: string; value: string; locations: Array<{ id: string; name: string; pickupFeeMinor: number; dropoffFeeMinor: number }>; fee: "pickup" | "dropoff"; first?: boolean }) {
   return (
     <div className={cx("flex flex-col gap-1 px-[18px] py-[14px]", !first && "lg:border-l lg:border-white/7")}>

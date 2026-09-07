@@ -66,14 +66,14 @@ export async function writeCatalogue(d1: D1Database, cat: ParsedCatalogue, now: 
         .prepare(
           `INSERT INTO bike_types
              (id, slug, name, category, model, size_label, rider_min_cm, rider_max_cm,
-              stock, listed, description, image, wc_product_id, created_at, updated_at)
-           VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?14)
+              stock, listed, description, image, images, wc_product_id, created_at, updated_at)
+           VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?15,?13,?14,?14)
            ON CONFLICT(id) DO UPDATE SET
              slug=excluded.slug, name=excluded.name, category=excluded.category,
              model=excluded.model, size_label=excluded.size_label,
              rider_min_cm=excluded.rider_min_cm, rider_max_cm=excluded.rider_max_cm,
              stock=excluded.stock, listed=excluded.listed, description=excluded.description,
-             image=excluded.image, updated_at=excluded.updated_at`,
+             image=excluded.image, images=excluded.images, updated_at=excluded.updated_at`,
         )
         .bind(
           b.id,
@@ -90,6 +90,7 @@ export async function writeCatalogue(d1: D1Database, cat: ParsedCatalogue, now: 
           b.image,
           b.wcProductId,
           now,
+          JSON.stringify(b.images),
         ),
     );
 

@@ -431,6 +431,7 @@ export interface SeedBikeType {
   listed: boolean;
   description: string | null;
   image: string | null;
+  images: string[];
   bands: Band[];
   addonSlugs: string[];
   issues: LadderIssue[];
@@ -539,6 +540,7 @@ export function parseCatalogue(csvText: string): ParsedCatalogue {
       listed,
       description: (row.description ?? "").trim() || null,
       image: (row.image_urls ?? "").split("|")[0]?.trim() || null,
+      images: (row.image_urls ?? "").split("|").map((u) => u.trim()).filter(Boolean),
       bands,
       addonSlugs: parseAddonCell(row["addons (name: DKK)"]).map((a) => a.slug),
       issues,

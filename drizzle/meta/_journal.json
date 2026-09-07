@@ -15,6 +15,13 @@
       "when": 1788777074790,
       "tag": "0001_tour_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788816805119,
+      "tag": "0002_bike_images",
+      "breakpoints": true
     }
   ]
 }

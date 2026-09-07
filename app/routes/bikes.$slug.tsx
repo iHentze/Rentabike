@@ -22,7 +22,11 @@ export async function loader({ context, request, params }: Route.LoaderArgs) {
   const bike = await getBike(env.DB, params.slug, trip);
   if (!bike) throw new Response("Not found", { status: 404 });
   const [addons, basket] = await Promise.all([getAddonsById(env.DB, bike.addonIds), readBasket(request, trip)]);
+  // ?img=n picks a photo from the gallery; anything odd falls back to the first.
+  const wanted = Number(url.searchParams.get("img") ?? 0);
+  const imageIndex = Number.isInteger(wanted) ? Math.min(Math.max(0, wanted), Math.max(0, bike.images.length - 1)) : 0;
   return {
+    imageIndex,
     tour: tour ? { title: tour.title, slug: tour.slug } : null,
     trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
     days: tripDays(trip),
@@ -46,7 +50,7 @@ export async function action({ context, request, params }: Route.ActionArgs) {
 }
 
 export default function BikeDetail({ loaderData }: Route.ComponentProps) {
-  const { tour, trip: t, days, bike, addons, inBasket, nextRider } = loaderData;
+  const { tour, trip: t, days, bike, addons, inBasket, nextRider, imageIndex } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const isExtra = bike.category === "extra";
   const canAdd = bike.free > 0 && (isExtra ? inBasket < bike.free : nextRider >= 0 && inBasket < bike.free);
@@ -64,13 +68,36 @@ export default function BikeDetail({ loaderData }: Route.ComponentProps) {
 
         <div className="mt-5 grid gap-7 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
           <div className="flex flex-col gap-7">
+            {/* the photo on its plate, and the rest of the gallery when the shop has more than one */}
             <Card className="overflow-hidden">
-              <div className="relative h-[280px] bg-white/5 md:h-[380px]">
-                <BikeImage bike={bike} className="object-contain p-6" />
+              <div className="relative h-[300px] md:h-[440px]">
+                <BikeImage bike={bike} src={bike.images[imageIndex]} eager className="p-5 md:p-8" />
                 <Tag tone="dark" className="absolute left-4 top-4">
                   {CATEGORY_LABEL[bike.category]}
                 </Tag>
+                {bike.images.length > 1 && (
+                  <span className="num absolute right-4 top-4 rounded-full bg-night/75 px-3 py-1 text-[12.5px] font-semibold text-ink">
+                    {imageIndex + 1} / {bike.images.length}
+                  </span>
+                )}
               </div>
+              {bike.images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto p-3">
+                  {bike.images.map((src, i) => (
+                    <Link
+                      key={src}
+                      to={tripHref(`/bikes/${bike.slug}`, trip, { img: i })}
+                      replace
+                      preventScrollReset
+                      aria-label={`Photo ${i + 1} of ${bike.images.length}`}
+                      aria-current={i === imageIndex ? "true" : undefined}
+                      className={cx("block h-[64px] w-[88px] shrink-0 overflow-hidden rounded-plaque", i === imageIndex ? "shadow-[inset_0_0_0_2px_#0A78D6]" : "opacity-70 hover:opacity-100")}
+                    >
+                      <BikeImage bike={bike} src={src} className="p-1" />
+                    </Link>
+                  ))}
+                </div>
+              )}
             </Card>
 
             <div className="flex flex-col gap-3">
