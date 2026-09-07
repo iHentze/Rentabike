@@ -26,3 +26,7 @@ npm-debug.log*
 # legacy Bolt app keeps its own ignores
 legacy/node_modules
 legacy/dist
+
+# wrangler local overrides / TypeScript incremental cache
+.dev.vars
+*.tsbuildinfo
