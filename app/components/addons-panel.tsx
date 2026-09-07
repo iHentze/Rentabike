@@ -74,7 +74,7 @@ export function AddonsPanel({ addons, action, riders, heading, helmetsIncluded, 
       )}
 
       {rest.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rest.map((a) => (
             <div key={a.id} className={cx("flex items-center gap-3 rounded-field px-[15px] py-[14px]", a.qty > 0 ? "bg-brand/18 shadow-[inset_0_0_0_1.5px_#0A78D6]" : "bg-white/5")}>
               <div className="flex min-w-0 flex-1 flex-col gap-[1px]">

@@ -122,7 +122,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
       <Header />
       <TripStrip trip={trip} tour={tour} pickup={pickup} dropoff={dropoff} />
 
-      <Shell className="grid gap-7 px-5 pb-10 pt-[26px] md:grid-cols-[226px_minmax(0,1fr)] md:px-8">
+      <Shell className="grid grid-cols-[minmax(0,1fr)] gap-7 px-5 pb-10 pt-[26px] md:grid-cols-[226px_minmax(0,1fr)] md:px-8">
         {/* filters */}
         <Form method="get" action="/bikes" className="flex flex-col gap-[22px] self-start rounded-card bg-card p-[18px]">
           {[...params.entries()].map(([k, v]) => (
@@ -161,7 +161,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
         </Form>
 
         {/* results */}
-        <div className="flex flex-col gap-[18px]">
+        <div className="flex min-w-0 flex-col gap-[18px]">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h1 className="font-display text-[28px] font-bold tracking-[-.022em]">
               {tour ? `${freeTotal} bikes free for ${tour.title}` : `${freeTotal} bikes free on your dates`}
