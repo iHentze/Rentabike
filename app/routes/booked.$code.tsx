@@ -118,13 +118,17 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
                   <div className="flex flex-col gap-1 border-t border-white/6 pt-3">
                     {others.map((l, i) => (
                       <div key={i} className="flex justify-between text-[13px] text-ink-soft">
-                        <span>{l.label}{l.qty > 1 ? ` ×${l.qty}` : ""}</span>
+                        <span>
+                          {l.label}
+                          {l.qty > 1 ? ` ×${l.qty}` : ""}
+                          {l.riderLabel && <span className="text-ink-mute"> · {l.riderLabel}</span>}
+                        </span>
                         <span className="num">{formatDKKCode(l.lineTotalMinor)}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                <span className="pt-1 text-[13px] font-medium text-ok">Lock and route card free · helmets {booking.kind === "tour" ? "included" : "DKK 50 per bike"}</span>
+                <span className="pt-1 text-[13px] font-medium text-ok">{booking.kind === "tour" ? "Helmets included on every guided ride" : "Everything is packed with the bikes before you arrive"}</span>
               </Card>
             </div>
             <div className="flex flex-col gap-3">

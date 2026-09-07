@@ -226,3 +226,17 @@ describe("rejects nonsense rather than pricing it", () => {
     expect(() => priceQuote({ ...days(1), bikes: [{ bikeTypeId: "untiered", qty: 1 }] }, cat)).toThrow(QuoteError);
   });
 });
+
+describe("add-ons that belong to a rider", () => {
+  it("carry the rider's label on their line, so the booking knows whose helmet is whose", () => {
+    const cat = catalogue();
+    const helmet = [...cat.addons.keys()][0]!;
+    const q = priceQuote(
+      { startAt: T0, endAt: T0 + h(24), bikes: [], addons: [{ addonId: helmet, qty: 1, riderLabel: "Jóhanna" }, { addonId: helmet, qty: 1, riderLabel: "Marek" }, { addonId: helmet, qty: 1 }] },
+      cat,
+    );
+    const lines = q.lines.filter((l) => l.kind === "addon");
+    expect(lines.map((l) => l.riderLabel)).toEqual(["Jóhanna", "Marek", undefined]);
+    expect(q.totalMinor).toBe(lines.reduce((n, l) => n + l.lineTotalMinor, 0));
+  });
+});

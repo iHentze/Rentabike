@@ -6,7 +6,7 @@ import { Card, Lbl, PillLink, cx } from "~/components/ui";
 import { BikeCard } from "~/components/bike-card";
 import { samePage, tripHref, tripParams } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { applyIntent, basketHeaders, nextRiderWithoutBike, ownBikeOnly, readBasket, ridersOn } from "~/lib/basket";
+import { applyIntent, basketHeaders, nextRiderWithoutBike, nextStep, ownBikeOnly, readBasket, ridersOn, stepHref } from "~/lib/basket";
 import { CATEGORY_LABEL, CATEGORY_ORDER, fitsRider, getAddonsById, listBikes } from "~/lib/catalogue/bikes";
 import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { priceBasket } from "~/lib/quote-basket";
@@ -81,6 +81,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     chosen: chosen.map((c) => ({ i: c.i, name: c.bike?.name ?? null, tripMinor: c.bike?.tripMinor ?? 0 })),
     extras: extras.filter((e) => e.bike).map((e) => ({ name: e.bike!.name, qty: e.qty })),
     nextRider: nextRiderWithoutBike(basket),
+    next: nextStep(basket),
     soFar,
   };
 }
@@ -109,7 +110,7 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Bikes({ loaderData }: Route.ComponentProps) {
-  const { here, tour, trip: t, pickup, dropoff, addons, helmetsIncluded, ownBike, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
+  const { here, tour, trip: t, pickup, dropoff, addons, helmetsIncluded, ownBike, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, next, soFar } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId, pickupLocationId: t.pickupLocationId, dropoffLocationId: t.dropoffLocationId };
   const params = tripParams(trip);
   const allAssigned = nextRider < 0;
@@ -220,8 +221,8 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
             {!allAssigned && !ownBike && <span className="text-[14px] text-warn">Rider {nextRider + 1} still needs a bike</span>}
             {ownBike && <span className="text-[14px] text-ok">Own bike — helmets and extras only</span>}
             {anyChosen ? (
-              <PillLink to={tripHref(allAssigned || ownBike ? "/checkout" : "/riders", trip)} tone="primary" size="md" className="px-7 py-[14px] text-[15.5px]">
-                {allAssigned || ownBike ? "Continue to checkout" : "Sort out the riders"}
+              <PillLink to={ownBike || !next ? tripHref("/checkout", trip) : stepHref(trip, next)} tone="primary" size="md" className="px-7 py-[14px] text-[15.5px]">
+                {ownBike || !next ? "Continue to checkout" : next.step === "bike" ? "Sort out the riders" : "Extras for each rider"}
               </PillLink>
             ) : (
               <PillLink to={tripHref("/choose", trip)} tone="ghost" size="md">

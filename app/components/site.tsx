@@ -187,7 +187,7 @@ function VisitTorshavn() {
 
 /** "Dates ✓ — Bikes ✓ — 3 Details & payment" */
 export function Steps({ current }: { current: 1 | 2 | 3 }) {
-  const steps = ["Dates", "Bikes", "Extras & details"];
+  const steps = ["Dates", "Riders — bikes and extras", "Details & payment"];
   return (
     <div className="border-t border-white/5 bg-header">
       <Shell className="flex items-center gap-3 px-5 py-[15px] md:px-8">

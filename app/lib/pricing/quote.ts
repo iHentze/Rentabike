@@ -56,7 +56,8 @@ export interface QuoteRequest {
   startAt: Date | number;
   endAt: Date | number;
   bikes: Array<{ bikeTypeId: string; qty: number; riderLabel?: string }>;
-  addons?: Array<{ addonId: string; qty: number }>;
+  /** `riderLabel` ties a per-bike add-on to the rider who wears it; per-booking add-ons carry none. */
+  addons?: Array<{ addonId: string; qty: number; riderLabel?: string }>;
   pickupLocationId?: string;
   /** Only charged when it differs from pickup — see A6. */
   dropoffLocationId?: string;
@@ -170,6 +171,7 @@ export function priceQuote(req: QuoteRequest, cat: QuoteCatalogue): Quote {
     lines.push({
       kind: "addon",
       addonId: addon.id,
+      riderLabel: sel.riderLabel,
       label: addon.name,
       qty: addon.unit === "per_booking" ? 1 : sel.qty,
       unitPriceMinor: addon.priceMinor,
