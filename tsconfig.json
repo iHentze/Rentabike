@@ -1,7 +1,31 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "types": ["node", "vite/client"],
+    "target": "ES2023",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "rootDirs": [".", "./.react-router/types"],
+    "baseUrl": ".",
+    "paths": { "~/*": ["./app/*"] },
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "app/**/*",
+    "workers/**/*",
+    "drizzle.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "react-router.config.ts",
+    ".react-router/types/**/*",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": ["legacy", "node_modules", "build"]
 }
