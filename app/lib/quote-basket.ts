@@ -10,11 +10,22 @@ import { loadQuoteCatalogue } from "./pricing/catalogue";
 import { priceQuote, type Quote, type QuoteRequest } from "./pricing/quote";
 import type { TourContext } from "./tour-trip";
 
+export interface PricedLine {
+  addonId: string;
+  label: string;
+  qty: number;
+  totalMinor: number;
+}
+
 export interface PricedBasket {
   request: QuoteRequest;
   quote: Quote | null;
   /** Rider index → their bike line total, for the summary rail. */
   riderTotals: Array<number | null>;
+  /** Rider index → their own extras, priced. */
+  riderExtras: PricedLine[][];
+  /** Add-ons that belong to the booking, not a rider: car carriers, bag storage, own-bike helmets. */
+  bookingAddonLines: PricedLine[];
   addonsTotal: number;
   extrasTotal: number;
   feesTotal: number;
@@ -26,7 +37,12 @@ export function quoteRequestFor(trip: Trip, basket: Basket): QuoteRequest {
     if (r.bikeTypeId) bikes.push({ bikeTypeId: r.bikeTypeId, qty: 1, riderLabel: riderLabel(basket, i) });
   });
   for (const [id, qty] of Object.entries(basket.extras)) bikes.push({ bikeTypeId: id, qty });
-  const addons = Object.entries(basket.addons).map(([addonId, qty]) => ({ addonId, qty }));
+  // A rider's extras carry their label, so the booking knows whose helmet is whose.
+  const addons: NonNullable<QuoteRequest["addons"]> = [];
+  basket.riders.forEach((r, i) => {
+    for (const [addonId, qty] of Object.entries(r.addons)) addons.push({ addonId, qty, riderLabel: riderLabel(basket, i) });
+  });
+  for (const [addonId, qty] of Object.entries(basket.addons)) addons.push({ addonId, qty });
   return {
     startAt: trip.startAt,
     endAt: trip.endAt,
@@ -44,9 +60,9 @@ export async function priceBasket(d1: D1Database, trip: Trip, basket: Basket, to
       // A hike or run: seats only.
       const seat = seatLine(tour, basket.riders.length);
       const quote: Quote = { days: 1, tierDays: 1, lines: [seat], totalMinor: seat.lineTotalMinor, currency: "DKK" };
-      return { request, quote, riderTotals: basket.riders.map(() => 0), addonsTotal: 0, extrasTotal: 0, feesTotal: 0 };
+      return { request, quote, riderTotals: basket.riders.map(() => 0), riderExtras: basket.riders.map(() => []), bookingAddonLines: [], addonsTotal: 0, extrasTotal: 0, feesTotal: 0 };
     }
-    return { request, quote: null, riderTotals: basket.riders.map(() => null), addonsTotal: 0, extrasTotal: 0, feesTotal: 0 };
+    return { request, quote: null, riderTotals: basket.riders.map(() => null), riderExtras: basket.riders.map(() => []), bookingAddonLines: [], addonsTotal: 0, extrasTotal: 0, feesTotal: 0 };
   }
   const catalogue = await loadQuoteCatalogue(d1, {
     bikeTypeIds: request.bikes.map((b) => b.bikeTypeId),
@@ -61,10 +77,17 @@ export async function priceBasket(d1: D1Database, trip: Trip, basket: Basket, to
     return quote.lines.find((l) => l.kind === "bike" && l.riderLabel === label && l.bikeTypeId === r.bikeTypeId)?.lineTotalMinor ?? null;
   });
   const extrasIds = new Set(Object.keys(basket.extras));
+  const asLine = (l: Quote["lines"][number]): PricedLine => ({ addonId: l.addonId ?? "", label: l.label, qty: l.qty, totalMinor: l.lineTotalMinor });
+  const riderExtras = basket.riders.map((_, i) => {
+    const label = riderLabel(basket, i);
+    return quote.lines.filter((l) => l.kind === "addon" && l.riderLabel === label).map(asLine);
+  });
   return {
     request,
     quote,
     riderTotals,
+    riderExtras,
+    bookingAddonLines: quote.lines.filter((l) => l.kind === "addon" && !l.riderLabel).map(asLine),
     addonsTotal: quote.lines.filter((l) => l.kind === "addon").reduce((n, l) => n + l.lineTotalMinor, 0),
     extrasTotal: quote.lines.filter((l) => l.kind === "bike" && !l.riderLabel && l.bikeTypeId && extrasIds.has(l.bikeTypeId)).reduce((n, l) => n + l.lineTotalMinor, 0),
     feesTotal: quote.lines.filter((l) => l.kind === "fee").reduce((n, l) => n + l.lineTotalMinor, 0),

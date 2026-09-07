@@ -8,7 +8,7 @@ import { SummaryRail } from "~/components/summary-rail";
 import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Pin, Shield, Warning } from "~/components/icons";
 import { tripDays, tripHref } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { basketHeaders, clearBasketHeaders, ownBikeOnly, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
+import { basketHeaders, clearBasketHeaders, nextStep, ownBikeOnly, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
 import { fitsRider, getAddonsById, getBikesById, listBikes } from "~/lib/catalogue/bikes";
 import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { priceBasket } from "~/lib/quote-basket";
@@ -39,15 +39,19 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   }
   const priced = await priceBasket(env.DB, trip, basket, tour);
 
-  // Extras, right at the top of checkout: the chosen bikes' allowlists, helmet first.
+  // Each rider's own extras were settled on their step. Here only what belongs to the whole
+  // booking is still open — unless the customer brought their own bike, in which case the
+  // helmets and bags they rent have no rider step to live on and are picked here.
+  const ownBike = !tour && ownBikeOnly(basket);
   const chosenBikeRows = basket.riders.map((r) => (r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined)).filter((b) => b !== undefined);
-  const addonIds = new Set<string>([HELMET_ID, ...chosenBikeRows.flatMap((b) => b.addonIds), ...Object.keys(basket.addons)]);
-  if (chosenBikeRows.length === 0) for (const b of bikes) for (const id of b.addonIds) addonIds.add(id);
+  const addonIds = new Set<string>(ownBike ? [HELMET_ID, ...bikes.flatMap((b) => b.addonIds)] : [...chosenBikeRows.flatMap((b) => b.addonIds), ...Object.keys(basket.addons)]);
   if (tour) addonIds.delete(HELMET_ID);
   const addons = [...(await getAddonsById(env.DB, [...addonIds])).values()]
+    .filter((a) => ownBike || a.unit === "per_booking" || basket.addons[a.id])
     .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
     .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 }));
-  const ownBike = !tour && ownBikeOnly(basket);
+  const helmetMissing = tour || ownBike ? [] : basket.riders.map((r, i) => ({ r, i })).filter(({ r }) => r.bikeTypeId && !(r.addons[HELMET_ID] ?? 0)).map(({ i }) => ({ r: i, label: riderLabel(basket, i) }));
+  const unfinished = nextStep(basket);
 
   // The recovery panel: a bike went between choosing and paying.
   const lostId = url.searchParams.get("lost");
@@ -74,10 +78,24 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     autoSwap: basket.autoSwap ?? false,
     riders: basket.riders.map((r, i) => {
       const bike = r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined;
-      return { label: riderLabel(basket, i), heightCm: r.heightCm ?? null, bikeName: bike?.name ?? null, size: bike?.sizeLabel ?? null, range: bike && bike.riderMinCm != null ? `rider ${bike.riderMinCm}–${bike.riderMaxCm} cm` : null, rateMinor: bike?.rateMinor ?? null, perDay: bike?.perDay ?? true, totalMinor: priced.riderTotals[i] ?? null, lost: Boolean(lost) && i === lostRider };
+      return {
+        label: riderLabel(basket, i),
+        heightCm: r.heightCm ?? null,
+        bikeName: bike?.name ?? null,
+        size: bike?.sizeLabel ?? null,
+        range: bike && bike.riderMinCm != null ? `rider ${bike.riderMinCm}–${bike.riderMaxCm} cm` : null,
+        rateMinor: bike?.rateMinor ?? null,
+        perDay: bike?.perDay ?? true,
+        totalMinor: priced.riderTotals[i] ?? null,
+        lost: Boolean(lost) && i === lostRider,
+        extras: priced.riderExtras[i]!.map((l) => ({ label: `${l.label.replace(/\s+for rent\b.*$/i, "")}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.totalMinor, included: Boolean(tour) && l.addonId === HELMET_ID })),
+        extrasDone: Boolean(r.extrasDone),
+      };
     }),
     extras: Object.entries(basket.extras).map(([id, qty]) => ({ label: `${bikes.find((b) => b.id === id)?.name ?? id} ×${qty}`, totalMinor: (bikes.find((b) => b.id === id)?.tripMinor ?? 0) * qty })),
-    addonLines: priced.quote?.lines.filter((l) => l.kind === "addon").map((l) => ({ label: `${l.label}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.lineTotalMinor })) ?? [],
+    addonLines: priced.bookingAddonLines.map((l) => ({ label: `${l.label}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.totalMinor })),
+    helmetMissing,
+    unfinished,
     fees: priced.quote?.lines.filter((l) => l.kind === "fee").map((l) => ({ label: l.label, totalMinor: l.lineTotalMinor })) ?? [],
     totalMinor: priced.quote?.totalMinor ?? 0,
     addons,
@@ -199,10 +217,9 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Checkout({ loaderData }: Route.ComponentProps) {
-  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error, addons, ownBike } = loaderData;
+  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error, addons, ownBike, helmetMissing, unfinished } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const here = tripHref("/checkout", trip);
-  const helmetQty = addons.find((a) => a.id === HELMET_ID)?.qty ?? 0;
   const dropoff = locations.find((l) => l.id === dropoffId);
   const pickup = locations.find((l) => l.id === pickupId);
   const differentReturn = dropoffId && dropoffId !== pickupId;
@@ -307,11 +324,52 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
             </Note>
           )}
 
-          {/* extras first: the helmet question gets answered before the card details */}
-          <Card className="px-[22px] py-5">
-            <AddonsPanel addons={addons} action={here} riders={trip.riders} heading={ownBike ? "Helmets and accessories for your own bike" : undefined} helmetsIncluded={Boolean(tour)} />
-            {ownBike && <p className="mt-4 text-[13.5px] text-ink-mute">No rental bike in this booking — that's fine. Everything here is fitted at the shop when you collect.</p>}
-          </Card>
+          {ownBike ? (
+            <Card className="px-[22px] py-5">
+              <AddonsPanel addons={addons} action={here} riders={trip.riders} heading="Helmets and accessories for your own bike" />
+              <p className="mt-4 text-[13.5px] text-ink-mute">No rental bike in this booking — that's fine. Everything here is fitted at the shop when you collect.</p>
+            </Card>
+          ) : (
+            !(tour && !tour.requiresBike) && (
+              <Card className="flex flex-col gap-4 p-[22px]">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-[20px] font-semibold tracking-[-.014em]">{riders.length === 1 ? "Your extras" : "Each rider's extras"}</h2>
+                  <span className="text-[13.5px] text-ink-mute">Settled per rider · change any of them</span>
+                </div>
+                <div className="flex flex-col gap-[10px]">
+                  {riders.map((r, i) => (
+                    <div key={i} className="flex items-start justify-between gap-3 border-t border-white/6 pt-[10px] first:border-t-0 first:pt-0">
+                      <div className="flex min-w-0 flex-col gap-[2px]">
+                        <span className="text-[14.5px] font-semibold">
+                          {r.label}
+                          {r.bikeName && <span className="font-normal text-ink-mute"> · {r.bikeName}</span>}
+                        </span>
+                        <span className={cx("text-[13.5px]", r.extras.length ? "text-ink-soft" : tour ? "text-ok" : "text-ink-mute")}>
+                          {r.extras.length ? r.extras.map((e) => e.label).join(", ") : tour ? "Helmet included" : r.extrasDone ? "Nothing extra" : "Not asked yet"}
+                        </span>
+                      </div>
+                      <Link to={tripHref("/riders", trip, { r: i + 1, step: r.bikeName ? "extras" : "bike" })} className="shrink-0 text-[13.5px] font-semibold text-brand-bright hover:text-ink">
+                        {r.bikeName ? "Change" : "Pick a bike"}
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+                {helmetMissing.length > 0 && (
+                  <Note icon={<Warning size={17} />}>
+                    {helmetMissing.map((h) => h.label).join(" and ")} {helmetMissing.length === 1 ? "has" : "have"} no helmet. Helmets are not included with rentals — DKK 50 each.{" "}
+                    <Link to={tripHref("/riders", trip, { r: helmetMissing[0]!.r + 1, step: "extras" })} className="font-semibold text-brand-bright">
+                      Add one
+                    </Link>
+                  </Note>
+                )}
+                {addons.length > 0 && (
+                  <div className="border-t border-white/6 pt-4">
+                    <AddonsPanel addons={addons} action={here} riders={trip.riders} heading={riders.length > 1 ? `For the ${riders.length === 2 ? "two" : riders.length} of you` : "For the booking"} />
+                  </div>
+                )}
+              </Card>
+            )
+          )}
 
           <Form method="post" action={here} id="checkout" className="flex flex-col gap-[18px]">
             <Card className="flex flex-col gap-4 p-[22px]">
@@ -430,15 +488,15 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
           <SummaryRail
             title={tour ? "Your tour" : "Your booking"}
             days={days}
-            riders={(tour && !tour.requiresBike) || ownBike ? [] : riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, included: Boolean(tour), detail: tour ? (r.bikeName ? "Bike and helmet" : null) : r.bikeName && r.rateMinor != null ? [r.range, r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)].filter(Boolean).join(" · ") : null, totalMinor: r.totalMinor, lost: r.lost }))}
+            riders={(tour && !tour.requiresBike) || ownBike ? [] : riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, included: Boolean(tour), detail: tour ? (r.bikeName ? "Bike and helmet" : null) : r.bikeName && r.rateMinor != null ? [r.range, r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)].filter(Boolean).join(" · ") : null, totalMinor: r.totalMinor, lost: r.lost, extras: r.extras }))}
             lines={[...(seatLine ? [{ label: `${seatLine.qty} × ${formatDKKCode(seatLine.unitPriceMinor)} · ${seatLine.label}`, totalMinor: seatLine.lineTotalMinor }] : []), ...extras, ...addonLines, ...fees]}
             totalMinor={totalMinor}
             totalLabel="Total"
             totalNote={ownBike ? "Own bike · helmets and extras only" : "Priced on our server, not your browser"}
           />
-          {!tour && !ownBike && helmetQty < trip.riders && (
+          {helmetMissing.length > 0 && (
             <span className="inline-flex items-start gap-[9px] px-1 text-[13px] leading-[1.5] text-warn">
-              <Warning size={14} className="mt-[2px] shrink-0" /> {helmetQty === 0 ? "No helmets in this booking." : `${trip.riders - helmetQty} of ${trip.riders} riders without a helmet.`} Add them above — DKK 50 each.
+              <Warning size={14} className="mt-[2px] shrink-0" /> {helmetMissing.length === riders.length ? "No helmets in this booking." : `${helmetMissing.map((h) => h.label).join(" and ")} without a helmet.`} DKK 50 each — change it above.
             </span>
           )}
           <div className="flex flex-col gap-1 text-[13.5px] text-ink-soft">

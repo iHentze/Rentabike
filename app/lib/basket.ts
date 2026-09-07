@@ -5,19 +5,23 @@
  * Prices are never stored here: ids and quantities only. The server prices.
  */
 import { createCookie } from "react-router";
-import type { Trip } from "./trip";
+import { tripHref, type Trip } from "./trip";
 
 export interface BasketRider {
   name?: string;
   heightCm?: number;
   bikeTypeId?: string;
+  /** This rider's own extras — helmet, pedals, bags — from their bike's allowlist: addon id → quantity. */
+  addons: Record<string, number>;
+  /** The rider has been through their extras step, even if they chose nothing. */
+  extrasDone?: boolean;
 }
 
 export interface Basket {
   riders: BasketRider[];
   /** Rentable extras (child seats, bags, pedals for your own bike): bike_type id → quantity. */
   extras: Record<string, number>;
-  /** Per-bike accessories from the add-on allowlist: addon id → quantity. */
+  /** Add-ons that belong to the booking rather than a rider — car carriers, bag storage, and helmets for people on their own bikes: addon id → quantity. */
   addons: Record<string, number>;
   pickupLocationId?: string;
   dropoffLocationId?: string;
@@ -45,7 +49,7 @@ export async function readBasket(request: Request, trip: Trip): Promise<Basket> 
     dropoffLocationId: typeof raw?.dropoffLocationId === "string" ? raw.dropoffLocationId : undefined,
     autoSwap: raw?.autoSwap === true,
   };
-  while (basket.riders.length < trip.riders) basket.riders.push({});
+  while (basket.riders.length < trip.riders) basket.riders.push({ addons: {} });
   basket.riders.length = trip.riders;
   if (!basket.pickupLocationId && trip.pickupLocationId) basket.pickupLocationId = trip.pickupLocationId;
   if (!basket.dropoffLocationId && trip.dropoffLocationId) basket.dropoffLocationId = trip.dropoffLocationId;
@@ -61,12 +65,14 @@ export async function clearBasketHeaders(): Promise<HeadersInit> {
 }
 
 function cleanRider(r: unknown): BasketRider {
-  if (typeof r !== "object" || r === null) return {};
+  if (typeof r !== "object" || r === null) return { addons: {} };
   const o = r as Record<string, unknown>;
   return {
     name: typeof o.name === "string" ? o.name.slice(0, 60) : undefined,
     heightCm: typeof o.heightCm === "number" && o.heightCm >= 80 && o.heightCm <= 230 ? Math.round(o.heightCm) : undefined,
     bikeTypeId: typeof o.bikeTypeId === "string" ? o.bikeTypeId : undefined,
+    addons: cleanCounts(o.addons),
+    extrasDone: o.extrasDone === true,
   };
 }
 
@@ -94,9 +100,49 @@ export function nextRiderWithoutBike(basket: Basket): number {
   return basket.riders.findIndex((r) => !r.bikeTypeId);
 }
 
+/** "Jóhanna", "Rider 2" — and "Anna (2)" when two riders share a name, so every line in the quote points at one person. */
 export function riderLabel(basket: Basket, i: number): string {
-  const r = basket.riders[i];
-  return r?.name?.trim() ? r.name.trim() : `Rider ${i + 1}`;
+  const name = basket.riders[i]?.name?.trim();
+  if (!name) return `Rider ${i + 1}`;
+  const earlier = basket.riders.slice(0, i).filter((r) => r.name?.trim().toLowerCase() === name.toLowerCase()).length;
+  return earlier ? `${name} (${earlier + 1})` : name;
+}
+
+export interface FunnelStep {
+  rider: number;
+  step: "bike" | "extras";
+}
+
+/**
+ * Where the funnel goes next: the first rider without a bike, else the first
+ * rider who has not been asked about their extras, else nowhere — checkout.
+ * One rider at a time, bike then extras, so nobody reaches checkout without
+ * having been asked about a helmet by name.
+ */
+export function nextStep(basket: Basket): FunnelStep | null {
+  const noBike = basket.riders.findIndex((r) => !r.bikeTypeId);
+  if (noBike >= 0) return { rider: noBike, step: "bike" };
+  const noExtras = basket.riders.findIndex((r) => r.bikeTypeId && !r.extrasDone);
+  if (noExtras >= 0) return { rider: noExtras, step: "extras" };
+  return null;
+}
+
+export function stepHref(trip: Trip, step: FunnelStep): string {
+  return tripHref("/riders", trip, { r: step.rider + 1, step: step.step });
+}
+
+/** Put a rider on a bike. Extras that the new bike cannot take are dropped, and the rider is asked about extras again. */
+export function assignBike(rider: BasketRider, bike: { id: string; addonIds?: string[] }): void {
+  if (rider.bikeTypeId !== bike.id) rider.extrasDone = false;
+  rider.bikeTypeId = bike.id;
+  if (bike.addonIds) for (const id of Object.keys(rider.addons)) if (!bike.addonIds.includes(id)) delete rider.addons[id];
+}
+
+/** Take a rider off their bike. Their extras go with it — they belonged to that bike. */
+export function unassignBike(rider: BasketRider): void {
+  delete rider.bikeTypeId;
+  rider.addons = {};
+  rider.extrasDone = false;
 }
 
 /**
@@ -104,7 +150,7 @@ export function riderLabel(basket: Basket, i: number): string {
  * and leave from the last; extras just count. `free` caps both so the basket
  * never promises more than the guard could accept.
  */
-export function applyIntent(basket: Basket, bike: { id: string; category: string; free: number }, intent: string): Basket {
+export function applyIntent(basket: Basket, bike: { id: string; category: string; free: number; addonIds?: string[] }, intent: string): Basket {
   if (bike.category === "extra") {
     const n = basket.extras[bike.id] ?? 0;
     if (intent === "add" && n < bike.free) basket.extras[bike.id] = n + 1;
@@ -116,10 +162,10 @@ export function applyIntent(basket: Basket, bike: { id: string; category: string
   }
   if (intent === "add") {
     const i = nextRiderWithoutBike(basket);
-    if (i >= 0 && ridersOn(basket, bike.id) < bike.free) basket.riders[i]!.bikeTypeId = bike.id;
+    if (i >= 0 && ridersOn(basket, bike.id) < bike.free) assignBike(basket.riders[i]!, bike);
   } else if (intent === "remove") {
     const i = basket.riders.map((r) => r.bikeTypeId).lastIndexOf(bike.id);
-    if (i >= 0) delete basket.riders[i]!.bikeTypeId;
+    if (i >= 0) unassignBike(basket.riders[i]!);
   }
   return basket;
 }

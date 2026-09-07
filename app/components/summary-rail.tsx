@@ -19,6 +19,8 @@ export interface RailRider {
   lost?: boolean;
   /** On a tour: the bike rides along at no charge. */
   included?: boolean;
+  /** The rider's own extras — helmet, pedals, bags — under their bike. */
+  extras?: RailLine[];
 }
 
 export interface RailLine {
@@ -46,31 +48,39 @@ export function SummaryRail({ title = "Your booking", days, riders, lines, total
       </div>
       <div className="flex flex-col gap-[15px] px-[18px] py-4">
         {riders.map((r, i) => (
-          <div key={i} className={cx("flex gap-3 border-b border-white/6 pb-[15px]", r.lost && "rounded-field bg-warn/10 px-[13px] pt-3")}>
-            <div className={cx("flex size-8 shrink-0 items-center justify-center rounded-full", r.bikeName && !r.lost ? "bg-ok text-ok-ink" : "border-2 border-dashed border-[#2C4A63] text-brand-bright")}>
-              {r.bikeName && !r.lost ? <Check size={16} strokeWidth={3} /> : <span className="text-[13px] font-bold">{i + 1}</span>}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-              <span className={cx("num text-[14.5px] font-semibold", r.lost && "text-warn-soft line-through")}>
-                {r.label}
-                {r.heightCm ? ` · ${r.heightCm} cm` : ""}
-              </span>
-              {r.bikeName ? (
-                <>
-                  <span className={cx("text-[13.5px]", r.lost ? "text-warn-soft" : "text-ink-soft")}>{r.bikeName}</span>
-                  {r.detail && <span className="num text-[13px] text-ink-mute">{r.detail}</span>}
-                </>
+          <div key={i} className={cx("flex flex-col gap-[9px] border-b border-white/6 pb-[15px]", r.lost && "rounded-field bg-warn/10 px-[13px] pt-3")}>
+            <div className="flex gap-3">
+              <div className={cx("flex size-8 shrink-0 items-center justify-center rounded-full", r.bikeName && !r.lost ? "bg-ok text-ok-ink" : "border-2 border-dashed border-[#2C4A63] text-brand-bright")}>
+                {r.bikeName && !r.lost ? <Check size={16} strokeWidth={3} /> : <span className="text-[13px] font-bold">{i + 1}</span>}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                <span className={cx("num text-[14.5px] font-semibold", r.lost && "text-warn-soft line-through")}>
+                  {r.label}
+                  {r.heightCm ? ` · ${r.heightCm} cm` : ""}
+                </span>
+                {r.bikeName ? (
+                  <>
+                    <span className={cx("text-[13.5px]", r.lost ? "text-warn-soft" : "text-ink-soft")}>{r.bikeName}</span>
+                    {r.detail && <span className="num text-[13px] text-ink-mute">{r.detail}</span>}
+                  </>
+                ) : (
+                  <span className="text-[13.5px] font-semibold text-brand-bright">Pick a bike →</span>
+                )}
+              </div>
+              {r.included && r.bikeName ? (
+                <span className="text-[13.5px] font-semibold text-ok">Included</span>
+              ) : r.totalMinor != null ? (
+                <Amount minor={r.totalMinor} className={cx("text-[14.5px]", r.lost && "text-ink-mute line-through")} />
               ) : (
-                <span className="text-[13.5px] font-semibold text-brand-bright">Pick a bike →</span>
+                <span className="text-[14.5px] text-ink-dim">—</span>
               )}
             </div>
-            {r.included && r.bikeName ? (
-              <span className="text-[13.5px] font-semibold text-ok">Included</span>
-            ) : r.totalMinor != null ? (
-              <Amount minor={r.totalMinor} className={cx("text-[14.5px]", r.lost && "text-ink-mute line-through")} />
-            ) : (
-              <span className="text-[14.5px] text-ink-dim">—</span>
-            )}
+            {r.extras?.map((e, j) => (
+              <div key={j} className="flex justify-between gap-3 pl-11 text-[13.5px]">
+                <span className="text-ink-soft">{e.label}</span>
+                {e.included ? <span className="font-semibold text-ok">Included</span> : <Amount minor={e.totalMinor} className="text-[13.5px]" />}
+              </div>
+            ))}
           </div>
         ))}
         {lines.map((l, i) => (
