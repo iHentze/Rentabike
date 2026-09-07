@@ -5,7 +5,7 @@ import { Footer, Header, SHOP, Shell, Steps } from "~/components/site";
 import { Card, Lbl, Note, PillLink, cx } from "~/components/ui";
 import { BikeImage } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
-import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Shield, Warning } from "~/components/icons";
+import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Pin, Shield, Warning } from "~/components/icons";
 import { tripDays, tripHref } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
 import { basketHeaders, clearBasketHeaders, ownBikeOnly, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
@@ -68,7 +68,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
     days: tripDays(trip),
     deadline: freeCancellationDeadline(trip.startAt).getTime(),
-    locations: locations.map((l) => ({ id: l.id, name: l.name, dropoffFeeMinor: l.dropoffFeeMinor, pickupFeeMinor: l.pickupFeeMinor })),
+    locations: locations.map((l) => ({ id: l.id, name: l.name, dropoffFeeMinor: l.dropoffFeeMinor, pickupFeeMinor: l.pickupFeeMinor, note: l.note })),
     pickupId: basket.pickupLocationId ?? null,
     dropoffId: basket.dropoffLocationId ?? null,
     autoSwap: basket.autoSwap ?? false,
@@ -204,6 +204,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
   const here = tripHref("/checkout", trip);
   const helmetQty = addons.find((a) => a.id === HELMET_ID)?.qty ?? 0;
   const dropoff = locations.find((l) => l.id === dropoffId);
+  const pickup = locations.find((l) => l.id === pickupId);
   const differentReturn = dropoffId && dropoffId !== pickupId;
 
   return (
@@ -374,6 +375,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
                   </div>
                 </label>
               </div>
+              {pickup?.note && <Note icon={<Pin size={17} />}>{pickup.note}</Note>}
               {differentReturn && dropoff && dropoff.dropoffFeeMinor > 0 ? (
                 <Note icon={<Warning size={17} />}>Returning to a different place adds a {formatDKKCode(dropoff.dropoffFeeMinor)} drop-off fee. It's in the total on the right.</Note>
               ) : (

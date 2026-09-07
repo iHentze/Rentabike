@@ -22,6 +22,13 @@
       "when": 1788816805119,
       "tag": "0002_bike_images",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788819253915,
+      "tag": "0003_location_details",
+      "breakpoints": true
     }
   ]
 }
