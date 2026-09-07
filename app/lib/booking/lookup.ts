@@ -9,6 +9,7 @@ export interface BookingLineView {
   lineTotalMinor: number;
   bikeTypeId: string | null;
   sizeLabel: string | null;
+  tourDepartureId: string | null;
 }
 
 export interface BookingView {
@@ -48,7 +49,7 @@ export async function getBookingByCode(d1: D1Database, code: string): Promise<Bo
   if (!b) return null;
   const lines = await d1
     .prepare(
-      `SELECT bl.kind, bl.label, bl.rider_label, bl.qty, bl.unit_price_minor, bl.line_total_minor, bl.bike_type_id, bt.size_label
+      `SELECT bl.kind, bl.label, bl.rider_label, bl.qty, bl.unit_price_minor, bl.line_total_minor, bl.bike_type_id, bt.size_label, bl.tour_departure_id
          FROM booking_lines bl LEFT JOIN bike_types bt ON bt.id = bl.bike_type_id
         WHERE bl.booking_id = ?1
         ORDER BY CASE bl.kind WHEN 'tour_seat' THEN 0 WHEN 'bike' THEN 1 WHEN 'addon' THEN 2 ELSE 3 END, bl.rider_label, bl.label`,
@@ -82,6 +83,7 @@ export async function getBookingByCode(d1: D1Database, code: string): Promise<Bo
       lineTotalMinor: l.line_total_minor as number,
       bikeTypeId: (l.bike_type_id as string | null) ?? null,
       sizeLabel: (l.size_label as string | null) ?? null,
+      tourDepartureId: (l.tour_departure_id as string | null) ?? null,
     })),
   };
 }
