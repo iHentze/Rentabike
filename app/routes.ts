@@ -14,6 +14,8 @@ export default [
   route("booked/:code", "routes/booked.$code.tsx"),
   route("booked/:code/calendar.ics", "routes/booked.$code.calendar[.]ics.ts"),
   route("health", "routes/health.ts"),
+  // Catalogue photos, fetched from the shop by the Worker and cached at the edge.
+  route("img/*", "routes/img.ts"),
   // The server prices. There is no route that accepts a price from the client.
   route("api/quote", "routes/api.quote.ts"),
 ] satisfies RouteConfig;
