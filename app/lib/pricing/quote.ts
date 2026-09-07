@@ -115,7 +115,8 @@ export function priceQuote(req: QuoteRequest, cat: QuoteCatalogue): Quote {
   const days = billableDays(req.startAt, req.endAt);
   const whole = tierDays(days);
 
-  if (req.bikes.length === 0) throw new QuoteError("a booking needs at least one bike");
+  // A customer with their own bike still rents helmets and bags: add-ons alone are a booking.
+  if (req.bikes.length === 0 && (req.addons ?? []).length === 0) throw new QuoteError("a booking needs at least one bike or add-on");
 
   const lines: QuoteLine[] = [];
 

@@ -5,7 +5,7 @@ import { Footer, Header, SHOP, Shell, TripStrip } from "~/components/site";
 import { Amount, Card, PillLink, Price, Tag, cx } from "~/components/ui";
 import { Availability, BikeImage, riderRange } from "~/components/bike-card";
 import { Check, Chevron } from "~/components/icons";
-import { tripDays, tripHref } from "~/lib/trip";
+import { samePage, tripDays, tripHref } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
 import { applyIntent, basketHeaders, nextRiderWithoutBike, readBasket, ridersOn } from "~/lib/basket";
 import { ADDON_UNIT_LABEL, CATEGORY_LABEL, getAddonsById, getBike } from "~/lib/catalogue/bikes";
@@ -42,7 +42,7 @@ export async function action({ context, request, params }: Route.ActionArgs) {
   const [bike, basket] = await Promise.all([getBike(env.DB, params.slug, trip), readBasket(request, trip)]);
   if (bike) applyIntent(basket, bike, intent);
   const next = String(form.get("next") ?? "");
-  return redirect(next || url.pathname + url.search, { headers: await basketHeaders(basket) });
+  return redirect(next || samePage(url), { headers: await basketHeaders(basket) });
 }
 
 export default function BikeDetail({ loaderData }: Route.ComponentProps) {

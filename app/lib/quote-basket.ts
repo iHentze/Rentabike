@@ -39,7 +39,7 @@ export function quoteRequestFor(trip: Trip, basket: Basket): QuoteRequest {
 
 export async function priceBasket(d1: D1Database, trip: Trip, basket: Basket, tour: TourContext | null = null): Promise<PricedBasket> {
   const request = quoteRequestFor(trip, basket);
-  if (request.bikes.length === 0) {
+  if (request.bikes.length === 0 && (request.addons ?? []).length === 0) {
     if (tour && !tour.requiresBike) {
       // A hike or run: seats only.
       const seat = seatLine(tour, basket.riders.length);

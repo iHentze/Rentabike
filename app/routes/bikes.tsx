@@ -4,10 +4,13 @@ import { cloudflareContext } from "~/context";
 import { Footer, Header, Shell, TripStrip } from "~/components/site";
 import { Card, Lbl, PillLink, cx } from "~/components/ui";
 import { BikeCard } from "~/components/bike-card";
-import { tripHref, tripParams } from "~/lib/trip";
+import { samePage, tripHref, tripParams } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { applyIntent, basketHeaders, nextRiderWithoutBike, readBasket, ridersOn } from "~/lib/basket";
-import { CATEGORY_LABEL, CATEGORY_ORDER, fitsRider, listBikes } from "~/lib/catalogue/bikes";
+import { applyIntent, basketHeaders, nextRiderWithoutBike, ownBikeOnly, readBasket, ridersOn } from "~/lib/basket";
+import { CATEGORY_LABEL, CATEGORY_ORDER, fitsRider, getAddonsById, listBikes } from "~/lib/catalogue/bikes";
+import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
+import { priceBasket } from "~/lib/quote-basket";
+import { listLocations } from "~/lib/booking/lookup";
 import type { BikeCategory } from "~/db/schema";
 import { fmtDays } from "~/lib/format";
 import { tripDays } from "~/lib/trip";
@@ -45,12 +48,29 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
   const chosen = basket.riders.map((r, i) => ({ i, bike: r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) ?? null : null }));
   const extras = Object.entries(basket.extras).map(([id, qty]) => ({ bike: bikes.find((b) => b.id === id) ?? null, qty }));
-  const soFar = chosen.reduce((n, c) => n + (c.bike?.tripMinor ?? 0), 0) + extras.reduce((n, e) => n + (e.bike ? e.bike.tripMinor * e.qty : 0), 0);
+
+  // Every add-on in the shop, helmet first: the customer with their own bike starts here.
+  const [allAddons, priced, locations] = await Promise.all([
+    getAddonsById(env.DB, [...new Set([...all.flatMap((b) => b.addonIds), ...Object.keys(basket.addons)])]),
+    priceBasket(env.DB, trip, basket, tour),
+    listLocations(env.DB),
+  ]);
+  const addons = [...allAddons.values()]
+    .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
+    .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 }));
+  const soFar = priced.quote?.totalMinor ?? 0;
+  const pickup = locations.find((l) => l.id === basket.pickupLocationId)?.name ?? null;
+  const dropoff = locations.find((l) => l.id === basket.dropoffLocationId)?.name ?? null;
 
   return {
-    here: url.pathname + url.search,
+    here: samePage(url),
     tour: tour ? { title: tour.title, slug: tour.slug } : null,
-    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId },
+    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, tourDepartureId: trip.tourDepartureId, pickupLocationId: trip.pickupLocationId, dropoffLocationId: trip.dropoffLocationId },
+    pickup,
+    dropoff,
+    addons,
+    helmetsIncluded: Boolean(tour),
+    ownBike: ownBikeOnly(basket),
     days: tripDays(trip),
     bikes: shown,
     freeTotal: bikes.filter((b) => b.category !== "extra").reduce((n, b) => n + b.free, 0),
@@ -75,22 +95,31 @@ export async function action({ context, request }: Route.ActionArgs) {
   const bikeId = String(form.get("bike") ?? "");
   const basket = await readBasket(request, trip);
 
-  const bike = (await listBikes(env.DB, trip)).find((b) => b.id === bikeId);
-  if (bike) applyIntent(basket, bike, intent);
-  return redirect(url.pathname + url.search, { headers: await basketHeaders(basket) });
+  if (intent === "addon") {
+    const id = String(form.get("addon") ?? "");
+    const delta = Number.parseInt(String(form.get("delta") ?? "0"), 10);
+    const n = (basket.addons[id] ?? 0) + (Number.isFinite(delta) ? delta : 0);
+    if (n <= 0) delete basket.addons[id];
+    else basket.addons[id] = Math.min(20, n);
+  } else {
+    const bike = (await listBikes(env.DB, trip)).find((b) => b.id === bikeId);
+    if (bike) applyIntent(basket, bike, intent);
+  }
+  return redirect(samePage(url), { headers: await basketHeaders(basket) });
 }
 
 export default function Bikes({ loaderData }: Route.ComponentProps) {
-  const { here, tour, trip: t, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
-  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
+  const { here, tour, trip: t, pickup, dropoff, addons, helmetsIncluded, ownBike, days, bikes, freeTotal, counts, cats, height, inBasket, chosen, extras, nextRider, soFar } = loaderData;
+  const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId, pickupLocationId: t.pickupLocationId, dropoffLocationId: t.dropoffLocationId };
   const params = tripParams(trip);
   const allAssigned = nextRider < 0;
-  const anyChosen = chosen.some((c) => c.name) || extras.length > 0;
+  const addonsChosen = addons.filter((a) => a.qty > 0);
+  const anyChosen = chosen.some((c) => c.name) || extras.length > 0 || addonsChosen.length > 0;
 
   return (
     <>
       <Header />
-      <TripStrip trip={trip} tour={tour} />
+      <TripStrip trip={trip} tour={tour} pickup={pickup} dropoff={dropoff} />
 
       <Shell className="grid gap-7 px-5 pb-10 pt-[26px] md:grid-cols-[226px_minmax(0,1fr)] md:px-8">
         {/* filters */}
@@ -147,6 +176,18 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
               ))}
             </div>
           )}
+
+          {/* helmets and accessories — also the whole booking for someone with their own bike */}
+          <Card id="accessories" className="scroll-mt-6 px-[22px] py-5">
+            <AddonsPanel
+              addons={addons}
+              action={here}
+              riders={trip.riders}
+              heading={tour ? "Anything else for the ride?" : "Helmets and accessories"}
+              helmetsIncluded={helmetsIncluded}
+            />
+            {!tour && <p className="mt-4 text-[13.5px] text-ink-mute">Brought your own bike? Add helmets or bags here and go straight to checkout — no bike needed.</p>}
+          </Card>
         </div>
       </Shell>
 
@@ -161,7 +202,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
               {anyChosen ? (
                 <>
                   <span className="text-[15px] font-semibold">
-                    {[...chosen.filter((c) => c.name).map((c) => c.name), ...extras.map((e) => `${e.qty} × ${e.name}`)].join(" · ")}
+                    {[...chosen.filter((c) => c.name).map((c) => c.name), ...extras.map((e) => `${e.qty} × ${e.name}`), ...addonsChosen.map((a) => `${a.qty} × ${a.name}`)].join(" · ")}
                   </span>
                   <span className="num text-[13px] text-ink-mute">
                     {fmtDays(days)} · DKK <Amount minor={soFar} className="font-normal" />
@@ -176,10 +217,11 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
           <div className="flex items-center gap-5">
-            {!allAssigned && <span className="text-[14px] text-warn">Rider {nextRider + 1} still needs a bike</span>}
+            {!allAssigned && !ownBike && <span className="text-[14px] text-warn">Rider {nextRider + 1} still needs a bike</span>}
+            {ownBike && <span className="text-[14px] text-ok">Own bike — helmets and extras only</span>}
             {anyChosen ? (
-              <PillLink to={tripHref(allAssigned ? "/checkout" : "/riders", trip)} tone="primary" size="md" className="px-7 py-[14px] text-[15.5px]">
-                {allAssigned ? "Continue to checkout" : "Sort out the riders"}
+              <PillLink to={tripHref(allAssigned || ownBike ? "/checkout" : "/riders", trip)} tone="primary" size="md" className="px-7 py-[14px] text-[15.5px]">
+                {allAssigned || ownBike ? "Continue to checkout" : "Sort out the riders"}
               </PillLink>
             ) : (
               <PillLink to={tripHref("/choose", trip)} tone="ghost" size="md">

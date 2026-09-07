@@ -8,8 +8,9 @@ import { SummaryRail } from "~/components/summary-rail";
 import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Shield, Warning } from "~/components/icons";
 import { tripDays, tripHref } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { basketHeaders, clearBasketHeaders, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
-import { fitsRider, getBikesById, listBikes } from "~/lib/catalogue/bikes";
+import { basketHeaders, clearBasketHeaders, ownBikeOnly, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
+import { fitsRider, getAddonsById, getBikesById, listBikes } from "~/lib/catalogue/bikes";
+import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { priceBasket } from "~/lib/quote-basket";
 import { listLocations } from "~/lib/booking/lookup";
 import { reserveBooking } from "~/lib/booking/reserve";
@@ -37,6 +38,16 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     basket.dropoffLocationId = shop.id;
   }
   const priced = await priceBasket(env.DB, trip, basket, tour);
+
+  // Extras, right at the top of checkout: the chosen bikes' allowlists, helmet first.
+  const chosenBikeRows = basket.riders.map((r) => (r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined)).filter((b) => b !== undefined);
+  const addonIds = new Set<string>([HELMET_ID, ...chosenBikeRows.flatMap((b) => b.addonIds), ...Object.keys(basket.addons)]);
+  if (chosenBikeRows.length === 0) for (const b of bikes) for (const id of b.addonIds) addonIds.add(id);
+  if (tour) addonIds.delete(HELMET_ID);
+  const addons = [...(await getAddonsById(env.DB, [...addonIds])).values()]
+    .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
+    .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 }));
+  const ownBike = !tour && ownBikeOnly(basket);
 
   // The recovery panel: a bike went between choosing and paying.
   const lostId = url.searchParams.get("lost");
@@ -69,7 +80,9 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     addonLines: priced.quote?.lines.filter((l) => l.kind === "addon").map((l) => ({ label: `${l.label}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.lineTotalMinor })) ?? [],
     fees: priced.quote?.lines.filter((l) => l.kind === "fee").map((l) => ({ label: l.label, totalMinor: l.lineTotalMinor })) ?? [],
     totalMinor: priced.quote?.totalMinor ?? 0,
-    ready: basket.riders.length > 0 && (tour && !tour.requiresBike ? tour.bookable && trip.riders <= tour.seatsLeft : basket.riders.every((r) => r.bikeTypeId)) && priced.quote !== null && (!tour || (tour.bookable && trip.riders <= tour.seatsLeft)),
+    addons,
+    ownBike,
+    ready: basket.riders.length > 0 && (tour && !tour.requiresBike ? tour.bookable && trip.riders <= tour.seatsLeft : ownBike || basket.riders.every((r) => r.bikeTypeId)) && priced.quote !== null && (!tour || (tour.bookable && trip.riders <= tour.seatsLeft)),
     lost: lost ? { id: lost.id, name: lost.name, rider: Number.isFinite(lostRider) ? lostRider : null, riderLabel: Number.isFinite(lostRider) ? riderLabel(basket, lostRider) : null, tripMinor: lost.tripMinor } : null,
     alternatives,
     error: url.searchParams.get("error"),
@@ -85,6 +98,14 @@ export async function action({ context, request }: Route.ActionArgs) {
   const basket = await readBasket(request, trip);
   const back = (extra: Record<string, string | number | undefined> = {}) => tripHref("/checkout", trip, extra);
 
+  if (intent === "addon") {
+    const id = String(form.get("addon") ?? "");
+    const delta = Number.parseInt(String(form.get("delta") ?? "0"), 10);
+    const n = (basket.addons[id] ?? 0) + (Number.isFinite(delta) ? delta : 0);
+    if (n <= 0) delete basket.addons[id];
+    else basket.addons[id] = Math.min(20, n);
+    return redirect(back(), { headers: await basketHeaders(basket) });
+  }
   if (intent === "give") {
     // Recovery: put the rider who lost their bike on the chosen replacement.
     const r = Number.parseInt(String(form.get("r") ?? ""), 10);
@@ -116,7 +137,7 @@ export async function action({ context, request }: Route.ActionArgs) {
   const headers = await basketHeaders(basket);
 
   if (name.length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return redirect(back({ error: "details" }), { headers });
-  const needBikes = !tour || tour.requiresBike;
+  const needBikes = (!tour || tour.requiresBike) && !(!tour && ownBikeOnly(basket));
   if (basket.riders.length === 0 || (needBikes && basket.riders.some((r) => !r.bikeTypeId))) return redirect(back({ error: "bikes" }), { headers });
   if (tour && (!tour.bookable || trip.riders > tour.seatsLeft)) return redirect(back({ error: "seats" }), { headers });
 
@@ -178,9 +199,10 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Checkout({ loaderData }: Route.ComponentProps) {
-  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error } = loaderData;
+  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error, addons, ownBike } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const here = tripHref("/checkout", trip);
+  const helmetQty = addons.find((a) => a.id === HELMET_ID)?.qty ?? 0;
   const dropoff = locations.find((l) => l.id === dropoffId);
   const differentReturn = dropoffId && dropoffId !== pickupId;
 
@@ -283,6 +305,12 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
               <Link to={tripHref("/riders", trip)} className="font-semibold text-brand-bright">Back to the riders</Link>
             </Note>
           )}
+
+          {/* extras first: the helmet question gets answered before the card details */}
+          <Card className="px-[22px] py-5">
+            <AddonsPanel addons={addons} action={here} riders={trip.riders} heading={ownBike ? "Helmets and accessories for your own bike" : undefined} helmetsIncluded={Boolean(tour)} />
+            {ownBike && <p className="mt-4 text-[13.5px] text-ink-mute">No rental bike in this booking — that's fine. Everything here is fitted at the shop when you collect.</p>}
+          </Card>
 
           <Form method="post" action={here} id="checkout" className="flex flex-col gap-[18px]">
             <Card className="flex flex-col gap-4 p-[22px]">
@@ -400,12 +428,17 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
           <SummaryRail
             title={tour ? "Your tour" : "Your booking"}
             days={days}
-            riders={tour && !tour.requiresBike ? [] : riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, included: Boolean(tour), detail: tour ? (r.bikeName ? "Bike and helmet" : null) : r.bikeName && r.rateMinor != null ? [r.range, r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)].filter(Boolean).join(" · ") : null, totalMinor: r.totalMinor, lost: r.lost }))}
+            riders={(tour && !tour.requiresBike) || ownBike ? [] : riders.map((r) => ({ label: r.label, heightCm: r.heightCm ?? undefined, bikeName: r.bikeName, included: Boolean(tour), detail: tour ? (r.bikeName ? "Bike and helmet" : null) : r.bikeName && r.rateMinor != null ? [r.range, r.perDay ? `${days} × ${formatDKKCode(r.rateMinor)}` : formatDKKCode(r.rateMinor)].filter(Boolean).join(" · ") : null, totalMinor: r.totalMinor, lost: r.lost }))}
             lines={[...(seatLine ? [{ label: `${seatLine.qty} × ${formatDKKCode(seatLine.unitPriceMinor)} · ${seatLine.label}`, totalMinor: seatLine.lineTotalMinor }] : []), ...extras, ...addonLines, ...fees]}
             totalMinor={totalMinor}
             totalLabel="Total"
-            totalNote="Priced on our server, not your browser"
+            totalNote={ownBike ? "Own bike · helmets and extras only" : "Priced on our server, not your browser"}
           />
+          {!tour && !ownBike && helmetQty < trip.riders && (
+            <span className="inline-flex items-start gap-[9px] px-1 text-[13px] leading-[1.5] text-warn">
+              <Warning size={14} className="mt-[2px] shrink-0" /> {helmetQty === 0 ? "No helmets in this booking." : `${trip.riders - helmetQty} of ${trip.riders} riders without a helmet.`} Add them above — DKK 50 each.
+            </span>
+          )}
           <div className="flex flex-col gap-1 text-[13.5px] text-ink-soft">
             <span className="font-semibold">{tour ? `${tour.title} · ${fmtDayTime(trip.startAt)}` : `${fmtDayTime(trip.startAt)} → ${fmtDayTime(trip.endAt)}`}</span>
             <span>{tour ? plural(trip.riders, tour.requiresBike ? "rider" : "person", tour.requiresBike ? "riders" : "people") : `${plural(trip.riders, "rider")} · ${days} ${days === 1 ? "day" : "days"}`}</span>

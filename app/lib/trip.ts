@@ -17,7 +17,12 @@ export interface Trip {
   explicit: boolean;
   /** Set when the dates are a tour departure's — see lib/tour-trip.ts. */
   tourDepartureId?: string;
+  /** Chosen in the booking bar; the basket takes them over from here. */
+  pickupLocationId?: string;
+  dropoffLocationId?: string;
 }
+
+const LOCATION_RE = /^[a-z0-9-]{1,40}$/;
 
 export const OPEN_FROM = "08:00";
 export const OPEN_UNTIL = "18:00";
@@ -59,7 +64,16 @@ export function readTrip(params: URLSearchParams, now: Date | number = Date.now(
     endAt = wallClock(shiftDate(from, 1), "17:00");
   }
 
-  return { startAt, endAt, riders, explicit: params.has("from") };
+  const pickup = params.get("pickup") ?? "";
+  const dropoff = params.get("dropoff") ?? "";
+  return {
+    startAt,
+    endAt,
+    riders,
+    explicit: params.has("from"),
+    pickupLocationId: LOCATION_RE.test(pickup) ? pickup : undefined,
+    dropoffLocationId: LOCATION_RE.test(dropoff) ? dropoff : undefined,
+  };
 }
 
 /** The trip back into a query string, to carry it from page to page. */
@@ -69,12 +83,25 @@ export function tripParams(trip: Trip, extra: Record<string, string | number | u
   const p = trip.tourDepartureId
     ? new URLSearchParams({ tour: trip.tourDepartureId, riders: String(trip.riders) })
     : new URLSearchParams({ from: s.date, fromTime: s.time, to: e.date, toTime: e.time, riders: String(trip.riders) });
+  if (!trip.tourDepartureId) {
+    if (trip.pickupLocationId) p.set("pickup", trip.pickupLocationId);
+    if (trip.dropoffLocationId) p.set("dropoff", trip.dropoffLocationId);
+  }
   for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "") p.set(k, String(v));
   return p;
 }
 
 export function tripHref(path: string, trip: Trip, extra?: Record<string, string | number | undefined>): string {
   return `${path}?${tripParams(trip, extra)}`;
+}
+
+/**
+ * The page a form should come back to. Single-fetch requests arrive as
+ * `/bikes.data?...` — redirecting there lands on a 404 — so strip the suffix
+ * and keep the query (filters, trip) as it was.
+ */
+export function samePage(url: URL): string {
+  return url.pathname.replace(/\.data$/, "") + url.search;
 }
 
 export function tripDays(trip: Trip): number {

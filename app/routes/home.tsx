@@ -9,6 +9,7 @@ import { faroeParts, fmtDuration } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
 import { listBikes, ridable, summariseCategories } from "~/lib/catalogue/bikes";
 import { listTours } from "~/lib/tours/catalogue";
+import { listLocations } from "~/lib/booking/lookup";
 
 export function meta(_: Route.MetaArgs) {
   return [
@@ -23,11 +24,12 @@ const FEATURED = ["viewpoint-nordadalsskard", "city-sightseeing-ebike", "histori
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
   const trip = readTrip(new URL(request.url).searchParams);
-  const [bikes, tours] = await Promise.all([listBikes(env.DB, trip), listTours(env.DB)]);
+  const [bikes, tours, locations] = await Promise.all([listBikes(env.DB, trip), listTours(env.DB), listLocations(env.DB)]);
   const fleet = ridable(bikes);
   const priced = fleet.filter((b) => b.free > 0);
   return {
-    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit },
+    trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, pickupLocationId: trip.pickupLocationId, dropoffLocationId: trip.dropoffLocationId },
+    locations: locations.map((l) => ({ id: l.id, name: l.name, pickupFeeMinor: l.pickupFeeMinor, dropoffFeeMinor: l.dropoffFeeMinor, isDefault: l.isDefault })),
     days: tripDays(trip),
     fleetUnits: fleet.reduce((n, b) => n + b.stock, 0),
     freeUnits: fleet.reduce((n, b) => n + b.free, 0),
@@ -38,8 +40,11 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { trip: t, days, fleetUnits, freeUnits, fromMinor, categories, tours } = loaderData;
-  const trip: Trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit };
+  const { trip: t, locations, days, fleetUnits, freeUnits, fromMinor, categories, tours } = loaderData;
+  const trip: Trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, pickupLocationId: t.pickupLocationId, dropoffLocationId: t.dropoffLocationId };
+  const defaultLoc = locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? "";
+  const pickupId = t.pickupLocationId ?? defaultLoc;
+  const dropoffId = t.dropoffLocationId ?? pickupId;
   const start = faroeParts(trip.startAt);
   const end = faroeParts(trip.endAt);
 
@@ -74,14 +79,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
 
           {/* booking, in the hero, where it belongs */}
-          <form method="get" action="/bikes" className="mt-10 grid gap-1 rounded-card bg-[rgba(11,20,28,.92)] p-2 md:grid-cols-[1.15fr_1fr_1fr_.85fr_auto]">
-            <div className="flex flex-col gap-1 rounded-field px-[18px] py-[14px]">
-              <Lbl>Pick up</Lbl>
-              <span className="text-[16px] font-semibold">{SHOP.address}</span>
-            </div>
+          <form method="get" action="/bikes" className="mt-10 flex flex-col gap-1 rounded-card bg-[rgba(11,20,28,.92)] p-2">
+            <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.1fr_1fr_1fr_.5fr]">
+            <LocationCell label="Pick up" name="pickup" value={pickupId} locations={locations} fee="pickup" first />
+            <LocationCell label="Return to" name="dropoff" value={dropoffId} locations={locations} fee="dropoff" />
             <DateTimeCell label="From" dateName="from" timeName="fromTime" date={start.date} time={start.time} />
             <DateTimeCell label="Until" dateName="to" timeName="toTime" date={end.date} time={end.time} />
-            <div className="flex flex-col gap-1 px-[18px] py-[14px] md:border-l md:border-white/7">
+            <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
               <Lbl>Riders</Lbl>
               <select name="riders" defaultValue={trip.riders} className="num -ml-1 bg-transparent text-[16px] font-semibold focus:outline-none">
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
@@ -91,15 +95,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 ))}
               </select>
             </div>
-            <div className="flex items-center justify-between gap-[18px] px-[6px] py-[6px] md:border-l md:border-white/7 md:pl-[22px]">
-              <div className="flex flex-col gap-[3px]">
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-[18px] border-t border-white/7 px-[18px] py-[10px]">
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-ok">
                   <span className={cx("size-2 rounded-full", freeUnits > 0 ? "bg-ok" : "bg-danger")} />
-                  {freeUnits > 0 ? `${freeUnits} bikes free` : "Nothing free on those days"}
+                  {freeUnits > 0 ? `${freeUnits} bikes free on those dates` : "Nothing free on those dates"}
                 </span>
                 <span className="num text-[13px] text-ink-soft">{fromMinor != null ? `from ${formatDKKCode(fromMinor)} / day` : `${days} days`}</span>
+                {dropoffId !== pickupId && <span className="num text-[13px] text-warn">different return point · fee applies</span>}
               </div>
-              <button type="submit" className="rounded-full bg-white px-7 py-4 text-[16px] font-bold whitespace-nowrap text-night hover:bg-ink-pale">
+              <button type="submit" className="rounded-full bg-white px-7 py-[14px] text-[16px] font-bold whitespace-nowrap text-night hover:bg-ink-pale">
                 Choose your bikes
               </button>
             </div>
@@ -179,13 +185,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   <span className="text-[13px] text-ink-mute">Seats, tag-alongs, kids' bikes</span>
                 </div>
               </Link>
-              <Link to={tripHref("/bikes", trip, { cat: "extra" })} className="flex items-center gap-[14px] rounded-field px-4 py-[15px] hover:bg-white/4">
+              <Link to={`${tripHref("/bikes", trip)}#accessories`} className="flex items-center gap-[14px] rounded-field px-4 py-[15px] hover:bg-white/4">
                 <div className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-ok/16 text-ok">
                   <Bag size={22} />
                 </div>
                 <div className="flex flex-col gap-[2px]">
-                  <span className="text-[15.5px] font-semibold">Helmet, lock, bags</span>
-                  <span className="num text-[13px] text-ink-mute">Helmet 50 · pedals 100</span>
+                  <span className="text-[15.5px] font-semibold">Helmet, bags, pedals</span>
+                  <span className="num text-[13px] text-ink-mute">Helmet 50 · pedals 100 · own bike welcome</span>
                 </div>
               </Link>
             </div>
@@ -221,10 +227,30 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   );
 }
 
+/** Where the bikes are collected or returned. The campsite carries a fee; it says so in the option. */
+function LocationCell({ label, name, value, locations, fee, first }: { label: string; name: string; value: string; locations: Array<{ id: string; name: string; pickupFeeMinor: number; dropoffFeeMinor: number }>; fee: "pickup" | "dropoff"; first?: boolean }) {
+  return (
+    <div className={cx("flex flex-col gap-1 px-[18px] py-[14px]", !first && "lg:border-l lg:border-white/7")}>
+      <Lbl>{label}</Lbl>
+      <select name={name} defaultValue={value} className="-ml-1 max-w-full bg-transparent text-[16px] font-semibold focus:outline-none">
+        {locations.map((l) => {
+          const f = fee === "pickup" ? l.pickupFeeMinor : l.dropoffFeeMinor;
+          return (
+            <option key={l.id} value={l.id} className="bg-card">
+              {l.name}
+              {f > 0 ? ` · +${formatDKKCode(f)}` : ""}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+}
+
 /** One cell of the booking bar: a date and a time, both native controls styled into the design. */
 function DateTimeCell({ label, dateName, timeName, date, time }: { label: string; dateName: string; timeName: string; date: string; time: string }) {
   return (
-    <div className="flex flex-col gap-1 px-[18px] py-[14px] md:border-l md:border-white/7">
+    <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
       <Lbl>{label}</Lbl>
       <div className="flex items-center gap-2 text-[16px] font-semibold">
         <input type="date" name={dateName} defaultValue={date} required className="num bg-transparent focus:outline-none [color-scheme:dark]" />

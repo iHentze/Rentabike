@@ -37,10 +37,12 @@ export function Plaque({ size = 30 }: { size?: number }) {
 
 const NAV = [
   { to: "/bikes", label: "Rent a bike" },
-  { to: "/tours", label: "Guided rides" },
-  { to: "/tours#hiking", label: "Hiking & trail runs" },
+  { to: "/tours", label: "Guided tours" },
   { to: "/booking", label: "My booking" },
 ];
+
+/** The WooCommerce shop stays where it is for sales; this site does rentals and tours. */
+export const WEBSHOP_URL = "https://rentabike.fo/shop/";
 
 export function Header({ variant = "site", right }: { variant?: "site" | "funnel"; right?: ReactNode }) {
   const home = variant === "site";
@@ -59,6 +61,9 @@ export function Header({ variant = "site", right }: { variant?: "site" | "funnel
                 {n.label}
               </NavLink>
             ))}
+            <a href={WEBSHOP_URL} className="text-[15px] font-medium text-ink-soft hover:text-ink">
+              Webshop <span aria-hidden>↗</span>
+            </a>
           </nav>
         )}
         <div className="ml-auto flex items-center gap-4">
@@ -92,7 +97,7 @@ export function TripSummary({ trip, changeTo = "/", tour }: { trip: Trip; change
 }
 
 /** The blue strip under the header on the catalogue: dates, pickup, riders. */
-export function TripStrip({ trip, tour }: { trip: Trip; tour?: { title: string; slug: string } | null }) {
+export function TripStrip({ trip, tour, pickup, dropoff }: { trip: Trip; tour?: { title: string; slug: string } | null; pickup?: string | null; dropoff?: string | null }) {
   return (
     <div className="bg-brand/14">
       <Shell className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-[13px] md:px-8">
@@ -102,7 +107,7 @@ export function TripStrip({ trip, tour }: { trip: Trip; tour?: { title: string; 
         </span>
         <span className="inline-flex items-center gap-[9px] text-[14.5px] font-semibold">
           <Pin size={17} className="text-brand-bright" />
-          {SHOP.address}
+          {tour ? SHOP.address : dropoff && dropoff !== (pickup ?? SHOP.address) ? `${pickup ?? SHOP.address} → ${dropoff}` : (pickup ?? SHOP.address)}
         </span>
         <span className="text-[14.5px] text-ink-soft">
           {fmtDays(tripDays(trip))} · {plural(trip.riders, "rider")}
@@ -128,7 +133,10 @@ export function Footer() {
         </div>
         <div className="flex flex-col gap-2 border-t border-white/7 pt-[18px] text-[13px] text-ink-dim sm:flex-row sm:items-center sm:justify-between">
           <span>
-            {SHOP.name} · {SHOP.address}, {SHOP.town} · rentabike.fo
+            {SHOP.name} · {SHOP.address}, {SHOP.town} ·{" "}
+            <a href={WEBSHOP_URL} className="hover:text-ink">
+              Webshop ↗
+            </a>
           </span>
           <span className="num">
             {SHOP.phone} · {SHOP.email}
@@ -179,7 +187,7 @@ function VisitTorshavn() {
 
 /** "Dates ✓ — Bikes ✓ — 3 Details & payment" */
 export function Steps({ current }: { current: 1 | 2 | 3 }) {
-  const steps = ["Dates", "Bikes", "Details & payment"];
+  const steps = ["Dates", "Bikes", "Extras & details"];
   return (
     <div className="border-t border-white/5 bg-header">
       <Shell className="flex items-center gap-3 px-5 py-[15px] md:px-8">

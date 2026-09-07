@@ -6,7 +6,7 @@
  *
  * Prices and weekly slots follow the canonical table settled against the
  * catalogue (the 4 March weekly sheet disagreed on five of them — the catalogue
- * wins). Departures for the next sixteen weeks are emitted too, so a fresh
+ * wins). Departures for the next 58 weeks are emitted too, so a fresh
  * local database has something to book; in production the cron keeps them
  * rolling (see app/lib/tours/ensure.ts).
  */
@@ -334,7 +334,7 @@ const TOURS: TourSeed[] = [
 const q = (v: string | number | null): string => (v === null ? "NULL" : typeof v === "number" ? String(v) : `'${v.replace(/'/g, "''")}'`);
 const now = Date.now();
 const out: string[] = [];
-const horizonWeeks = Number(process.argv.find((a) => a.startsWith("--weeks="))?.slice(8) ?? 16);
+const horizonWeeks = Number(process.argv.find((a) => a.startsWith("--weeks="))?.slice(8) ?? 58);
 const today = new Date(now).toISOString().slice(0, 10);
 const horizon = new Date(now + horizonWeeks * 7 * 86_400_000).toISOString().slice(0, 10);
 
