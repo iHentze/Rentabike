@@ -1,6 +1,7 @@
 import { Form, Link } from "react-router";
 import type { CatalogueBike } from "~/lib/catalogue/bikes";
 import { CATEGORY_LABEL } from "~/lib/catalogue/bikes";
+import { imageSrc } from "~/lib/catalogue/images";
 import { BikeArt, Minus, Plus } from "./icons";
 import { Price, Tag, cx } from "./ui";
 
@@ -25,7 +26,7 @@ export function riderRange(b: Pick<CatalogueBike, "sizeLabel" | "riderMinCm" | "
  * gallery; otherwise the main one. No photo at all draws the line-art bike.
  */
 export function BikeImage({ bike, src, eager, className }: { bike: Pick<CatalogueBike, "image" | "name" | "category">; src?: string | null; eager?: boolean; className?: string }) {
-  const url = src ?? bike.image;
+  const url = imageSrc(src ?? bike.image);
   return url ? (
     <div className={cx("flex size-full items-center justify-center bg-white p-3", className)}>
       <img src={url} alt="" loading={eager ? "eager" : "lazy"} className="max-h-full max-w-full object-contain" style={{ width: "auto", height: "auto" }} />
