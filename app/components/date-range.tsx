@@ -9,7 +9,7 @@
  * browser render byte-identical markup whatever timezone either sits in.
  */
 import { useEffect, useRef, useState } from "react";
-import { Chevron } from "./icons";
+import { Chevron, ChevronDown } from "./icons";
 import { Lbl, cx } from "./ui";
 import { OPENING_TIMES } from "~/lib/trip";
 
@@ -55,6 +55,7 @@ function monthGrid(ym: string): Array<string | null> {
 
 export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: string; to: string; fromTime: string; toTime: string; today: string }) {
   const [range, setRange] = useState({ from, to });
+  const [times, setTimes] = useState({ from: fromTime, to: toTime });
   const [open, setOpen] = useState<null | "from" | "to">(null);
   const [month, setMonth] = useState(from.slice(0, 7));
   const [hover, setHover] = useState<string | null>(null);
@@ -92,8 +93,11 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
     }
   };
 
-  const nights = Math.round((Date.parse(range.to) - Date.parse(range.from)) / 86_400_000);
   const firstMonth = today.slice(0, 7);
+  // Same day out and back: the return must come after the pickup, so the menu only offers later slots.
+  const sameDay = range.from === range.to;
+  const returnSlots = sameDay ? OPENING_TIMES.filter((t) => t > times.from) : OPENING_TIMES;
+  const toTimeShown = returnSlots.includes(times.to) ? times.to : (returnSlots[0] ?? times.to);
   // While picking the last day, the range previews up to the day under the pointer.
   const previewTo = open === "to" && hover && hover >= range.from ? hover : range.to;
 
@@ -101,14 +105,14 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
     <div ref={box} className="contents">
       <input type="hidden" name="from" value={range.from} />
       <input type="hidden" name="to" value={range.to} />
+      <input type="hidden" name="fromTime" value={times.from} />
+      <input type="hidden" name="toTime" value={toTimeShown} />
       <div className="relative flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
         <Lbl>From</Lbl>
         <div className="flex items-center gap-2 text-[16px] font-semibold">
           <button type="button" onClick={() => show("from")} aria-haspopup="dialog" aria-expanded={open === "from"} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open === "from" && "text-brand-bright")}>
-            {dayLabel(range.from)}
+            {dayLabel(range.from)} <span className="text-ink-mute">·</span> {times.from}
           </button>
-          <span className="text-ink-mute">·</span>
-          <TimeSelect name="fromTime" value={fromTime} />
         </div>
 
         {open && (
@@ -129,11 +133,11 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
                 <Month key={ym} ym={ym} today={today} from={range.from} to={previewTo} onPick={pick} onHover={setHover} className={i === 1 ? "hidden sm:block" : undefined} />
               ))}
             </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/6 pt-3">
-              <span className="num text-[13.5px] text-ink-soft">
-                {dayLabel(range.from)} → {dayLabel(range.to)} · {nights === 0 ? "same day" : `${nights + 1} days`}
-              </span>
-              <button type="button" onClick={() => setOpen(null)} className="rounded-full bg-white px-[18px] py-[8px] text-[14px] font-bold text-night hover:bg-ink-pale">
+            {/* the times, in the same place as the days — one visit settles the whole trip */}
+            <div className="mt-4 grid gap-3 border-t border-white/6 pt-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <TimePick label="Collect" day={dayLabel(range.from)} value={times.from} slots={OPENING_TIMES} onChange={(t) => setTimes({ ...times, from: t })} />
+              <TimePick label="Return" day={dayLabel(range.to)} value={toTimeShown} slots={returnSlots} onChange={(t) => setTimes({ ...times, to: t })} />
+              <button type="button" onClick={() => setOpen(null)} className="rounded-full bg-white px-[20px] py-[10px] text-[14px] font-bold text-night hover:bg-ink-pale">
                 Done
               </button>
             </div>
@@ -144,10 +148,8 @@ export function DateRangeCells({ from, to, fromTime, toTime, today }: { from: st
         <Lbl>Until</Lbl>
         <div className="flex items-center gap-2 text-[16px] font-semibold">
           <button type="button" onClick={() => show("to")} aria-haspopup="dialog" aria-expanded={open === "to"} className={cx("num -mx-1 rounded-md px-1 text-left hover:text-brand-bright", open === "to" && "text-brand-bright")}>
-            {dayLabel(range.to)}
+            {dayLabel(range.to)} <span className="text-ink-mute">·</span> {toTimeShown}
           </button>
-          <span className="text-ink-mute">·</span>
-          <TimeSelect name="toTime" value={toTime} />
         </div>
       </div>
     </div>
@@ -202,14 +204,23 @@ function Month({ ym, today, from, to, onPick, onHover, className }: { ym: string
   );
 }
 
-function TimeSelect({ name, value }: { name: string; value: string }) {
+/** "Collect · Fri 18 Sep · [09:00]" — a half-hour menu within opening hours, dressed as a pill. */
+function TimePick({ label, day, value, slots, onChange }: { label: string; day: string; value: string; slots: string[]; onChange: (t: string) => void }) {
   return (
-    <select name={name} defaultValue={value} className="num bg-transparent focus:outline-none">
-      {OPENING_TIMES.map((t) => (
-        <option key={t} value={t} className="bg-card">
-          {t}
-        </option>
-      ))}
-    </select>
+    <label className="flex flex-col gap-[6px]">
+      <Lbl>
+        {label} · {day}
+      </Lbl>
+      <span className="relative inline-flex">
+        <select value={value} onChange={(e) => onChange(e.target.value)} className="num w-full appearance-none rounded-full bg-white/8 py-[9px] pl-4 pr-9 text-[15px] font-semibold focus:outline-2 focus:outline-brand-bright">
+          {slots.map((t) => (
+            <option key={t} value={t} className="bg-card">
+              {t}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-mute" />
+      </span>
+    </label>
   );
 }
