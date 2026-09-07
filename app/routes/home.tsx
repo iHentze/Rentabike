@@ -1,10 +1,11 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { cloudflareContext } from "~/context";
+import { DateRangeCells } from "~/components/date-range";
 import { Footer, Header, SHOP, Shell } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Row, Tag, cx } from "~/components/ui";
 import { Bag, Bolt, CardIcon, Chevron, Child, Gravel, Mountain, Pin, Road, Shield } from "~/components/icons";
-import { OPENING_TIMES, readTrip, tripDays, tripHref, type Trip } from "~/lib/trip";
+import { readTrip, tripDays, tripHref, type Trip } from "~/lib/trip";
 import { faroeParts, fmtDuration } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
 import { listBikes, ridable, summariseCategories } from "~/lib/catalogue/bikes";
@@ -31,6 +32,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, pickupLocationId: trip.pickupLocationId, dropoffLocationId: trip.dropoffLocationId },
     locations: locations.map((l) => ({ id: l.id, name: l.name, pickupFeeMinor: l.pickupFeeMinor, dropoffFeeMinor: l.dropoffFeeMinor, isDefault: l.isDefault })),
     days: tripDays(trip),
+    today: faroeParts(new Date()).date,
     fleetUnits: fleet.reduce((n, b) => n + b.stock, 0),
     freeUnits: fleet.reduce((n, b) => n + b.free, 0),
     fromMinor: priced.length ? Math.min(...priced.map((b) => b.rateMinor)) : null,
@@ -40,7 +42,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { trip: t, locations, days, fleetUnits, freeUnits, fromMinor, categories, tours } = loaderData;
+  const { trip: t, locations, days, fleetUnits, freeUnits, fromMinor, categories, tours, today } = loaderData;
   const trip: Trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, pickupLocationId: t.pickupLocationId, dropoffLocationId: t.dropoffLocationId };
   const defaultLoc = locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? "";
   const pickupId = t.pickupLocationId ?? defaultLoc;
@@ -53,7 +55,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <Header />
 
       {/* hero: real customers on real bikes */}
-      <section className="relative overflow-hidden">
+      <section className="relative">
         <img
           src="/images/tour-adventure-mtb-light.jpg"
           alt="A rider pushing a mountain bike along a ridge above the valley, sun through the mist"
@@ -83,8 +85,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.1fr_1fr_1fr_.5fr]">
             <LocationCell label="Pick up" name="pickup" value={pickupId} locations={locations} fee="pickup" first />
             <LocationCell label="Return to" name="dropoff" value={dropoffId} locations={locations} fee="dropoff" />
-            <DateTimeCell label="From" dateName="from" timeName="fromTime" date={start.date} time={start.time} />
-            <DateTimeCell label="Until" dateName="to" timeName="toTime" date={end.date} time={end.time} />
+            <DateRangeCells from={start.date} to={end.date} fromTime={start.time} toTime={end.time} today={today} />
             <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
               <Lbl>Riders</Lbl>
               <select name="riders" defaultValue={trip.riders} className="num -ml-1 bg-transparent text-[16px] font-semibold focus:outline-none">
@@ -243,26 +244,6 @@ function LocationCell({ label, name, value, locations, fee, first }: { label: st
           );
         })}
       </select>
-    </div>
-  );
-}
-
-/** One cell of the booking bar: a date and a time, both native controls styled into the design. */
-function DateTimeCell({ label, dateName, timeName, date, time }: { label: string; dateName: string; timeName: string; date: string; time: string }) {
-  return (
-    <div className="flex flex-col gap-1 px-[18px] py-[14px] lg:border-l lg:border-white/7">
-      <Lbl>{label}</Lbl>
-      <div className="flex items-center gap-2 text-[16px] font-semibold">
-        <input type="date" name={dateName} defaultValue={date} required className="num bg-transparent focus:outline-none [color-scheme:dark]" />
-        <span className="text-ink-mute">·</span>
-        <select name={timeName} defaultValue={time} className="num bg-transparent focus:outline-none">
-          {OPENING_TIMES.map((t) => (
-            <option key={t} value={t} className="bg-card">
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
     </div>
   );
 }

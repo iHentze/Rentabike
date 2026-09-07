@@ -194,7 +194,7 @@ export default function BikeDetail({ loaderData }: Route.ComponentProps) {
 
             {inBasket > 0 && (
               <div className="flex items-center gap-2 rounded-field bg-ok/12 px-4 py-3 text-[14px] font-semibold text-ok">
-                <Check size={15} /> {isExtra ? `${inBasket} in your basket` : inBasket === 1 ? "In your basket" : `${inBasket} riders on this bike`}
+                <Check size={15} /> {isExtra ? `${inBasket} in your booking` : inBasket === 1 ? "In your booking" : `${inBasket} riders on this bike`}
               </div>
             )}
 
