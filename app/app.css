@@ -7,6 +7,15 @@
  * screen is the primary action. Blue is never decoration — only the thing
  * you can act on. Green = done/included, amber = attention, red = gone.
  */
+@layer base {
+  /* A hint in a field must be readable on a dark card, not a whisper. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-mute);
+    opacity: 1;
+  }
+}
+
 @theme {
   --color-ground: #070e15;
   --color-header: #0b141c;
@@ -16,8 +25,8 @@
   --color-ink: #ffffff;
   --color-ink-pale: #c6d5e0;
   --color-ink-soft: #9bb0c2;
-  --color-ink-mute: #6b8399;
-  --color-ink-dim: #3a4a57;
+  --color-ink-mute: #7f95a8;
+  --color-ink-dim: #4d6172;
 
   --color-brand: #0a78d6;
   --color-brand-bright: #4fa6e8;

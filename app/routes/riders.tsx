@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/riders";
 import { cloudflareContext } from "~/context";
@@ -269,19 +270,13 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     <h2 className="text-[19px] font-semibold tracking-[-.012em]">{me.name ? `How tall is ${me.name}?` : `Who is rider ${current + 1}, and how tall?`}</h2>
                     <span className="text-[14px] text-ink-mute">We'll pick the frame</span>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-[7px]">
                       <Lbl>Name (optional)</Lbl>
-                      <input name="name" defaultValue={me.name} placeholder={`Rider ${current + 1}`} className="rounded-field bg-white/7 px-[15px] py-[12px] text-[15.5px] placeholder:text-ink-dim focus:outline-2 focus:outline-brand-bright" />
+                      <input name="name" defaultValue={me.name} placeholder={`Rider ${current + 1}`} className="rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[12px] text-[15.5px] placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright" />
                     </label>
-                    <label className="flex flex-col gap-[7px]">
-                      <Lbl>Height</Lbl>
-                      <div className="flex items-center rounded-field bg-white/7 px-[15px] focus-within:outline-2 focus-within:outline-brand-bright">
-                        <input name="heightCm" type="number" min={80} max={230} defaultValue={me.heightCm ?? ""} placeholder="175" className="num w-full bg-transparent py-[12px] text-[15.5px] placeholder:text-ink-dim focus:outline-none" />
-                        <span className="text-[14px] text-ink-mute">cm</span>
-                      </div>
-                    </label>
-                    <button className="self-end rounded-full bg-white/9 px-6 py-[12px] text-[15px] font-semibold hover:bg-white/14">Save</button>
+                    <HeightField value={me.heightCm ?? null} />
+                    <button className="justify-self-start rounded-full bg-white/12 px-6 py-[12px] text-[15px] font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,.1)] hover:bg-white/16 sm:col-span-2">Save</button>
                   </div>
                 </Form>
                 <div className="flex gap-[11px] rounded-field bg-white/5 px-[15px] py-[13px]">
@@ -540,5 +535,51 @@ function Radio({ on }: { on: boolean }) {
     <span className={cx("flex size-[21px] shrink-0 items-center justify-center rounded-full border-2", on ? "border-brand" : "border-ink-dim")}>
       {on && <span className="size-[10px] rounded-full bg-brand" />}
     </span>
+  );
+}
+
+/**
+ * The height picker from the canvas: a slider for the thumb, a number box for
+ * the keyboard, one value between them. The number box is what the form posts.
+ */
+function HeightField({ value }: { value: number | null }) {
+  const [cm, setCm] = useState<number | "">(value ?? "");
+  const shown = typeof cm === "number" ? Math.min(205, Math.max(140, cm)) : 172;
+  return (
+    <div className="flex flex-col gap-[7px] sm:col-span-2">
+      <Lbl>Height</Lbl>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px] sm:items-center">
+        <div className="flex flex-col gap-[6px] px-1 pt-2">
+          <input
+            type="range"
+            min={140}
+            max={205}
+            step={1}
+            value={shown}
+            onChange={(e) => setCm(Number(e.target.value))}
+            aria-label="Height in centimetres"
+            className="h-2 w-full cursor-pointer accent-brand"
+          />
+          <div className="num flex items-baseline justify-between text-[12.5px] text-ink-mute">
+            <span>140 cm</span>
+            <span className={cx("text-[15px] font-bold", typeof cm === "number" ? "text-ink" : "text-ink-mute")}>{typeof cm === "number" ? `${cm} cm` : "slide or type"}</span>
+            <span>205 cm</span>
+          </div>
+        </div>
+        <div className="flex items-center rounded-field bg-white/10 px-[15px] shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] focus-within:outline-2 focus-within:outline-brand-bright">
+          <input
+            name="heightCm"
+            type="number"
+            min={80}
+            max={230}
+            value={cm}
+            onChange={(e) => setCm(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder="175"
+            className="num w-full bg-transparent py-[12px] text-[15.5px] placeholder:text-ink-mute focus:outline-none"
+          />
+          <span className="text-[14px] text-ink-mute">cm</span>
+        </div>
+      </div>
+    </div>
   );
 }
