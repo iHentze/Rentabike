@@ -100,6 +100,8 @@ export const addons = sqliteTable(
     unit: text("unit", { enum: ADDON_UNITS }).notNull(),
     priceMinor: integer("price_minor").notNull(),
     isSale: integer("is_sale", { mode: "boolean" }).notNull().default(false),
+    /** A photo, where the shop's extras catalogue has one for this kind of thing. */
+    image: text("image"),
   },
   (t) => [uniqueIndex("addons_slug_idx").on(t.slug)],
 );

@@ -325,6 +325,28 @@ export interface ParsedAddon {
   priceMinor: number;
   isSale: boolean;
   unit: AddonUnit;
+  /** A photo from the shop's extras catalogue that shows this kind of thing, when there is one. */
+  image?: string | null;
+}
+
+/**
+ * The add-ons are priced per product and carry no photos of their own; the
+ * shop's Extras category does. Match by kind: every helmet add-on gets the
+ * helmets photo, every pedal add-on the pedals photo, and so on.
+ */
+const ADDON_PHOTO_RULES: Array<[test: RegExp, productTitle: RegExp]> = [
+  [/helmet/i, /^Helmets for rent/i],
+  [/pedal/i, /^Pedals for rent/i],
+  [/rear rack|basket/i, /^Bags for rear rack/i],
+  [/storr?age/i, /storage slot/i],
+];
+export function addonImageFor(name: string, extras: Array<{ title: string; image: string | null }>): string | null {
+  for (const [test, product] of ADDON_PHOTO_RULES) {
+    if (!test.test(name)) continue;
+    const hit = extras.find((e) => product.test(e.title) && e.image);
+    if (hit) return hit.image;
+  }
+  return null;
 }
 
 // Greedy (.*) splits on the LAST colon: a name may end in "." or "''" right
@@ -546,6 +568,10 @@ export function parseCatalogue(csvText: string): ParsedCatalogue {
       issues,
     });
   }
+
+  // Photos for the add-ons, from the Extras products that picture the same thing.
+  const extras = rows.filter((r) => (r.subcategory ?? "").trim().toUpperCase() === "EXTRA").map((r) => ({ title: r.title ?? "", image: (r.image_urls ?? "").split("|")[0]?.trim() || null }));
+  for (const a of addons.values()) a.image = addonImageFor(a.name, extras);
 
   return { bikeTypes, addons, addonOnly, report };
 }

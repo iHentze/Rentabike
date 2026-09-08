@@ -105,3 +105,30 @@ export function BikeArt({ motor = false, className = "" }: { motor?: boolean; cl
     </svg>
   );
 }
+
+/** Line drawings for extras the shop has no photo of — one per kind, all the same weight. */
+export function AddonArt({ kind, className }: { kind: "helmet" | "pedal" | "bag" | "rack" | "mount" | "bottle" | "gps" | "carrier" | "storage" | "other"; className?: string }) {
+  const base = { viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, className };
+  switch (kind) {
+    case "helmet":
+      return <svg {...base}><path d="M8 27a16 16 0 0 1 32 0v3H8z" /><path d="M8 30h32l-3 6H11z" /><path d="M16 12l3 15M32 12l-3 15" /></svg>;
+    case "pedal":
+      return <svg {...base}><path d="M10 20h28l-4 12H14z" /><path d="M24 20v-8M20 12h8" /><path d="M14 26h20" /></svg>;
+    case "bag":
+      return <svg {...base}><path d="M10 18h28l-2 20H12z" /><path d="M17 18v-4a7 7 0 0 1 14 0v4" /><path d="M14 26h20" /></svg>;
+    case "rack":
+      return <svg {...base}><path d="M8 22h32M8 22l4-10h24l4 10" /><path d="M14 22v12M34 22v12M14 30h20" /></svg>;
+    case "mount":
+      return <svg {...base}><rect x="16" y="6" width="16" height="30" rx="3" /><path d="M22 10h4M24 42v-6M14 42h20" /></svg>;
+    case "bottle":
+      return <svg {...base}><path d="M19 8h10v6l4 6v20a2 2 0 0 1-2 2H17a2 2 0 0 1-2-2V20l4-6z" /><path d="M15 26h18" /></svg>;
+    case "gps":
+      return <svg {...base}><rect x="14" y="8" width="20" height="26" rx="4" /><path d="M20 20l4 4 6-8M24 34v8M18 42h12" /></svg>;
+    case "carrier":
+      return <svg {...base}><path d="M6 30h36v6H6z" /><path d="M12 30V14l8-6h8l8 6v16" /><circle cx="14" cy="41" r="3" /><circle cx="34" cy="41" r="3" /></svg>;
+    case "storage":
+      return <svg {...base}><path d="M8 18l16-8 16 8v16l-16 8-16-8z" /><path d="M8 18l16 8 16-8M24 26v16" /></svg>;
+    default:
+      return <svg {...base}><path d="M8 12h16l16 16-12 12L8 24z" /><circle cx="15" cy="19" r="2.5" /></svg>;
+  }
+}

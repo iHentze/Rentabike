@@ -7,6 +7,7 @@ import { Form } from "react-router";
 import { Minus, Plus } from "./icons";
 import { cx } from "./ui";
 import { formatDKKCode } from "~/lib/money";
+import { AddonCard } from "./addon-card";
 
 export const HELMET_ID = "addon-helmet-for-rent";
 
@@ -17,6 +18,7 @@ export interface PanelAddon {
   unit: "per_bike" | "per_bike_per_day" | "per_booking";
   qty: number;
   isSale?: boolean;
+  image?: string | null;
 }
 
 export function unitLabel(unit: PanelAddon["unit"]): string {
@@ -74,19 +76,9 @@ export function AddonsPanel({ addons, action, riders, heading, helmetsIncluded, 
       )}
 
       {rest.length > 0 && (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-[14px] md:grid-cols-2">
           {rest.map((a) => (
-            <div key={a.id} className={cx("flex items-center gap-3 rounded-field px-[15px] py-[14px]", a.qty > 0 ? "bg-brand/18 shadow-[inset_0_0_0_1.5px_#0A78D6]" : "bg-white/5")}>
-              <div className="flex min-w-0 flex-1 flex-col gap-[1px]">
-                <span className="truncate text-[14.5px] font-semibold">{a.name}</span>
-                <span className={cx("num text-[12.5px]", a.qty > 0 ? "font-semibold text-brand-bright" : "text-ink-mute")}>
-                  {formatDKKCode(a.priceMinor)} {unitLabel(a.unit)}
-                  {a.isSale && " · yours to keep"}
-                  {a.qty > 0 && ` · ${a.qty} added`}
-                </span>
-              </div>
-              <Stepper addon={a} action={action} hidden={hidden} />
-            </div>
+            <AddonCard key={a.id} addon={a} action={action} intent="addon" hidden={hidden} max={20} />
           ))}
         </div>
       )}

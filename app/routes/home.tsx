@@ -86,7 +86,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
         {/* booking, right under the words — over the foot of the photo where there is room for it */}
         <Shell className="relative px-5 pb-2 md:-mt-[180px] md:px-8">
-          <form method="get" action="/bikes" className="flex flex-col gap-1 rounded-card bg-[rgba(11,20,28,.92)] p-2 shadow-[0_18px_50px_rgba(0,0,0,.35)]">
+          <form method="get" action="/riders" className="flex flex-col gap-1 rounded-card bg-[rgba(11,20,28,.92)] p-2 shadow-[0_18px_50px_rgba(0,0,0,.35)]">
             <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-[1.1fr_1.1fr_1fr_1fr_.5fr]">
             <LocationCell label="Pick up" name="pickup" value={pickupId} locations={locations} fee="pickup" first />
             <LocationCell label="Return to" name="dropoff" value={dropoffId} locations={locations} fee="dropoff" />
