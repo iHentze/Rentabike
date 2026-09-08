@@ -181,7 +181,7 @@ export function Footer() {
         {/* the two marks side by side at every width; centred on phones where they would otherwise stack left */}
         <div className="flex flex-col gap-4 border-t border-white/7 pt-[22px] max-sm:items-center sm:gap-[18px]">
           <span className="lbl">Supported by</span>
-          <div className="flex items-center gap-5 sm:gap-8">
+          <div className="flex flex-wrap items-center justify-center gap-5 sm:justify-start sm:gap-8">
             <img src="/images/interreg-npa.svg" alt="Interreg Northern Periphery and Arctic, co-funded by the European Union" width={232} height={70} className="block h-[54px] w-auto sm:h-[70px]" />
             <VisitTorshavn />
           </div>
