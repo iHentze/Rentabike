@@ -530,10 +530,18 @@ function RiderForm({ here, current, name, heightCm }: { here: string; current: n
   const fetcher = useFetcher();
   const form = useRef<HTMLFormElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Only post what changed: a blur after a save must not post again, because a
+  // stale rider save racing a "Give to rider" click would overwrite the basket.
+  const sent = useRef(`${name ?? ""}|${heightCm ?? ""}`);
   const submit = (delayMs = 0) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      if (form.current) fetcher.submit(form.current);
+      if (!form.current) return;
+      const fd = new FormData(form.current);
+      const key = `${String(fd.get("name") ?? "").trim()}|${String(fd.get("heightCm") ?? "")}`;
+      if (key === sent.current) return;
+      sent.current = key;
+      fetcher.submit(form.current);
     }, delayMs);
   };
   useEffect(() => () => {
@@ -555,9 +563,7 @@ function RiderForm({ here, current, name, heightCm }: { here: string; current: n
             name="name"
             defaultValue={name}
             placeholder={`Rider ${current + 1}`}
-            onBlur={(e) => {
-              if (e.target.value.trim() !== (name ?? "")) submit();
-            }}
+            onBlur={() => submit()}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

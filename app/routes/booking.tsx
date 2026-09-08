@@ -7,6 +7,9 @@ import { Calendar, Check, Shield, Warning } from "~/components/icons";
 import { getBookingByCode, type BookingView } from "~/lib/booking/lookup";
 import { FREE_CANCELLATION_HOURS, freeCancellationDeadline, refundFor } from "~/lib/booking/cancellation";
 import { canTransition, transition } from "~/lib/booking/lifecycle";
+import { releaseSeats } from "~/lib/admin/actions";
+import { refundBooking } from "~/lib/payments/settle";
+import { sendCancellation, originOf } from "~/lib/email/send";
 import type { BookingStatus } from "~/db/schema";
 import { fmtDayTime, fmtLongDay, fmtTime } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
@@ -56,7 +59,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 }
 
 export async function action({ context, request }: Route.ActionArgs) {
-  const { env } = context.get(cloudflareContext);
+  const { env, ctx } = context.get(cloudflareContext);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "find");
   const code = String(form.get("code") ?? "");
@@ -68,13 +71,15 @@ export async function action({ context, request }: Route.ActionArgs) {
     const now = Date.now();
     const v = view(found, now);
     if (!v.cancellable) return { code, email, found: v, error: "not-cancellable", done: null as string | null };
-    const refund = refundFor(found.startAt, now, found.totalMinor, "customer");
+    const refund = refundFor(found.startAt, now, found.paidMinor - found.refundedMinor, "customer");
     await transition(env.DB, { bookingId: found.id, from: found.status as BookingStatus, to: "cancelled", actor: "customer", note: refund.reason, now });
-    // A tour booking hands its seats back; bikes free themselves because a cancelled booking holds nothing.
-    const seat = found.lines.find((l) => l.kind === "tour_seat" && l.tourDepartureId);
-    if (seat?.tourDepartureId) {
-      await env.DB.prepare(`UPDATE tour_departures SET seats_taken = MAX(0, seats_taken - ?2) WHERE id = ?1`).bind(seat.tourDepartureId, seat.qty).run();
-    }
+    await releaseSeats(env.DB, found);
+    // Money back through ePay when the rule says so; an uncaptured authorisation is always released.
+    const money = await refundBooking(env, found.id, refund.refundMinor, "customer", refund.reason, now).catch((err) => {
+      console.error(`refund failed for ${found.code}:`, err);
+      return { refundedMinor: 0, voided: false };
+    });
+    ctx.waitUntil(sendCancellation(env, { ...found, status: "cancelled" }, { refundMinor: money.voided ? found.paidMinor : money.refundedMinor, byShop: false }, originOf(request)));
     const after = await getBookingByCode(env.DB, found.code);
     return { code, email, found: after ? view(after, now) : null, error: null as string | null, done: refund.fraction === 1 ? "free" : "charged" };
   }

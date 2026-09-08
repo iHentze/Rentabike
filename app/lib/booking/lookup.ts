@@ -29,25 +29,34 @@ export interface BookingView {
   /** The hand-over instructions for the pickup place, when it has any (the airport does). */
   pickupNote: string | null;
   notes: string | null;
+  staffNotes: string | null;
   totalMinor: number;
+  paymentMethod: "shop" | "card";
+  /** Authorised or captured on the card so far, and what went back. */
+  paidMinor: number;
+  refundedMinor: number;
   holdExpiresAt: number | null;
   createdAt: number;
   lines: BookingLineView[];
 }
 
-export async function getBookingByCode(d1: D1Database, code: string): Promise<BookingView | null> {
-  const b = await d1
-    .prepare(
-      `SELECT b.id, b.code, b.kind, b.status, b.start_at, b.end_at, b.customer_name, b.customer_email, b.customer_phone,
-              b.pickup_location_id, b.dropoff_location_id, b.notes, b.total_minor, b.hold_expires_at, b.created_at,
+const SELECT = `SELECT b.id, b.code, b.kind, b.status, b.start_at, b.end_at, b.customer_name, b.customer_email, b.customer_phone,
+              b.pickup_location_id, b.dropoff_location_id, b.notes, b.staff_notes, b.total_minor, b.payment_method, b.paid_minor, b.refunded_minor,
+              b.hold_expires_at, b.created_at,
               p.name AS pickup_name, p.note AS pickup_note, d.name AS dropoff_name
          FROM bookings b
          LEFT JOIN locations p ON p.id = b.pickup_location_id
-         LEFT JOIN locations d ON d.id = b.dropoff_location_id
-        WHERE b.code = ?1`,
-    )
-    .bind(code.toUpperCase())
-    .first<Record<string, unknown>>();
+         LEFT JOIN locations d ON d.id = b.dropoff_location_id`;
+
+export async function getBookingByCode(d1: D1Database, code: string): Promise<BookingView | null> {
+  return hydrate(d1, await d1.prepare(`${SELECT} WHERE b.code = ?1`).bind(code.toUpperCase()).first<Record<string, unknown>>());
+}
+
+export async function getBookingById(d1: D1Database, id: string): Promise<BookingView | null> {
+  return hydrate(d1, await d1.prepare(`${SELECT} WHERE b.id = ?1`).bind(id).first<Record<string, unknown>>());
+}
+
+async function hydrate(d1: D1Database, b: Record<string, unknown> | null): Promise<BookingView | null> {
   if (!b) return null;
   const lines = await d1
     .prepare(
@@ -74,7 +83,11 @@ export async function getBookingByCode(d1: D1Database, code: string): Promise<Bo
     dropoffName: (b.dropoff_name as string | null) ?? null,
     pickupNote: (b.pickup_note as string | null) ?? null,
     notes: (b.notes as string | null) ?? null,
+    staffNotes: (b.staff_notes as string | null) ?? null,
     totalMinor: b.total_minor as number,
+    paymentMethod: (b.payment_method as "shop" | "card") ?? "shop",
+    paidMinor: (b.paid_minor as number) ?? 0,
+    refundedMinor: (b.refunded_minor as number) ?? 0,
     holdExpiresAt: (b.hold_expires_at as number | null) ?? null,
     createdAt: b.created_at as number,
     lines: (lines.results ?? []).map((l) => ({
