@@ -5,7 +5,8 @@ import { Footer, Header, SHOP, Shell, TripSummary } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
 import { BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
-import { Check, Chevron, Info, Minus, Plus } from "~/components/icons";
+import { FunnelSteps } from "~/components/funnel-steps";
+import { Check, Info, Minus, Plus } from "~/components/icons";
 import { AddonsPanel, HELMET_ID, unitLabel } from "~/components/addons-panel";
 import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
@@ -230,48 +231,31 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
     <>
       <Header variant="funnel" right={<TripSummary trip={trip} tour={tour} />} />
 
-      {/* rider tabs: one rider at a time, bike then extras */}
-      <div className="border-t border-white/5 bg-header">
-        <Shell className="flex items-stretch overflow-x-auto px-5 md:px-8">
-          {riders.map((r, i) => {
-            const active = i === current;
-            const done = Boolean(r.bikeName) && r.extrasDone;
-            const status = done
-              ? [r.bikeName, r.bikeSize, r.summary.length ? r.summary.join(", ") : tour ? null : "no extras"].filter(Boolean).join(" · ")
-              : active
-                ? step === "bike"
-                  ? "Choosing a bike now · extras next"
-                  : `${r.bikeName} · extras now`
-                : r.bikeName
-                  ? `${r.bikeName} · extras to pick`
-                  : i > 0
-                    ? `After ${riders[i - 1]!.label}`
-                    : "Not chosen yet";
-            return (
-              <Link key={i} to={tripHref("/riders", trip, { r: i + 1 })} className={cx("flex shrink-0 items-center gap-3 py-[15px] pr-[22px]", i > 0 && "pl-[22px]", active && "border-b-2 border-brand")}>
-                <div className={cx("flex size-8 shrink-0 items-center justify-center rounded-full", done ? "bg-ok text-ok-ink" : active ? "border-2 border-brand text-brand-bright" : "border-2 border-dashed border-ink-dim text-ink-dim")}>
-                  {done ? <Check size={16} strokeWidth={3} /> : <span className="text-[13.5px] font-bold">{i + 1}</span>}
-                </div>
-                <div className="flex flex-col gap-[1px]">
-                  <span className={cx("text-[14.5px] font-semibold", !active && !done && "text-ink-mute")}>
-                    Rider {i + 1}
-                    {r.name && ` · ${r.name}`}
-                  </span>
-                  <span className={cx("max-w-[260px] truncate text-[12.5px]", done ? "text-ok" : active ? "text-brand-bright" : "text-ink-dim")}>{status}</span>
-                </div>
-              </Link>
-            );
-          })}
-          {trip.riders < MAX_RIDERS && (
-            <Link to={tripHref("/riders", trip, { riders: trip.riders + 1, r: trip.riders + 1 })} className="ml-auto flex shrink-0 items-center pl-6 text-[14px] font-semibold text-brand-bright hover:text-ink">
-              + Add a rider
-            </Link>
-          )}
-        </Shell>
-      </div>
+      <FunnelSteps
+        trip={trip}
+        tour={tour}
+        riders={riders.map((r) => ({ label: r.label, bikeDone: Boolean(r.bikeName), extrasDone: Boolean(r.bikeName) && r.extrasDone }))}
+        position={{ at: "rider", i: current, step }}
+        canCheckout={allDone}
+        addRiderHref={trip.riders < MAX_RIDERS ? tripHref("/riders", trip, { riders: trip.riders + 1, r: trip.riders + 1 }) : undefined}
+      />
 
       <Shell className="grid gap-7 px-5 pb-12 pt-[22px] lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start md:px-8">
         <div className="flex flex-col gap-5">
+          {/* where we are, in words: step n of m, what this screen is for, what follows */}
+          <div className="flex flex-col gap-[6px]">
+            <Lbl>
+              Step {2 + current * 2 + (step === "extras" ? 1 : 0)} of {riders.length * 2 + 2} · {first}
+            </Lbl>
+            <h1 className="font-display text-[30px] font-bold leading-[1.05] tracking-[-.024em] md:text-[36px]">{step === "bike" ? `A bike for ${first}` : `Extras for ${first}`}</h1>
+            <span className="text-[14.5px] text-ink-soft">
+              {step === "bike"
+                ? `Then ${first}'s extras, then ${current < riders.length - 1 ? `${riders[current + 1]!.label}'s bike` : "checkout"}.`
+                : after
+                  ? `Then ${after.label}'s ${after.step === "bike" ? "bike" : "extras"}, then checkout.`
+                  : "Then checkout."}
+            </span>
+          </div>
           {step === "bike" ? (
             <>
               {/* height */}
@@ -365,7 +349,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
             </>
           ) : (
             <>
-              {/* where this rider is: bike done, extras now, then whoever is next */}
+              {/* the bike this is for, and the way back to change it */}
               <div className="flex flex-wrap items-center gap-2 px-[2px]">
                 <span className="inline-flex items-center gap-2 rounded-full bg-ok/12 px-[15px] py-[9px] text-[13.5px] font-semibold text-ok">
                   <Check size={14} strokeWidth={3.2} /> Bike · {me.bikeName}
@@ -374,18 +358,6 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     Change
                   </Link>
                 </span>
-                <Chevron size={15} className="text-ink-dim" />
-                <span className="rounded-full bg-brand/20 px-[15px] py-[9px] text-[13.5px] font-bold shadow-[inset_0_0_0_1.5px_#0A78D6]">Extras for {first}</span>
-                {after && (
-                  <>
-                    <Chevron size={15} className="text-ink-dim" />
-                    <span className="rounded-full bg-white/5 px-[15px] py-[9px] text-[13.5px] font-semibold text-ink-mute">
-                      {after.label}'s {after.step === "bike" ? "bike" : "extras"}
-                    </span>
-                  </>
-                )}
-                <Chevron size={15} className="text-ink-dim" />
-                <span className="rounded-full bg-white/5 px-[15px] py-[9px] text-[13.5px] font-semibold text-ink-mute">Checkout</span>
               </div>
 
               {copyFrom && (

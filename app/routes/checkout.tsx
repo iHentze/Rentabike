@@ -5,6 +5,7 @@ import { Footer, Header, SHOP, Shell, Steps } from "~/components/site";
 import { Card, Lbl, Note, PillLink, cx } from "~/components/ui";
 import { BikeImage } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
+import { FunnelSteps } from "~/components/funnel-steps";
 import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Pin, Shield, Warning } from "~/components/icons";
 import { tripDays, tripHref } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
@@ -234,7 +235,11 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
           </span>
         }
       />
-      <Steps current={3} />
+      {ownBike || (tour && !tour.requiresBike) ? (
+        <Steps current={3} />
+      ) : (
+        <FunnelSteps trip={trip} tour={tour} riders={riders.map((r) => ({ label: r.label, bikeDone: Boolean(r.bikeName), extrasDone: Boolean(r.bikeName) && r.extrasDone }))} position={{ at: "checkout" }} canCheckout />
+      )}
 
       <Shell className="grid gap-7 px-5 pb-12 pt-7 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start md:px-8">
         <div className="flex flex-col gap-[18px]">
