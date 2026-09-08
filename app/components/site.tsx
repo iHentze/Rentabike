@@ -178,10 +178,11 @@ export function Footer() {
   return (
     <footer>
       <Shell className="flex flex-col gap-[18px] px-5 pb-11 pt-[22px] md:px-8">
-        <div className="flex flex-col gap-[18px] border-t border-white/7 pt-[22px]">
+        {/* the two marks side by side at every width; centred on phones where they would otherwise stack left */}
+        <div className="flex flex-col gap-4 border-t border-white/7 pt-[22px] max-sm:items-center sm:gap-[18px]">
           <span className="lbl">Supported by</span>
-          <div className="flex flex-wrap items-center gap-8">
-            <img src="/images/interreg-npa.svg" alt="Interreg Northern Periphery and Arctic, co-funded by the European Union" width={232} height={70} className="block h-[70px] w-auto" />
+          <div className="flex items-center gap-5 sm:gap-8">
+            <img src="/images/interreg-npa.svg" alt="Interreg Northern Periphery and Arctic, co-funded by the European Union" width={232} height={70} className="block h-[54px] w-auto sm:h-[70px]" />
             <VisitTorshavn />
           </div>
         </div>
@@ -209,8 +210,8 @@ export function Footer() {
  */
 function VisitTorshavn() {
   return (
-    <div className="flex shrink-0 items-center gap-[11px]" role="img" aria-label="Visit Tórshavn">
-      <svg viewBox="0 0 150 165" width="56" height="61.6" aria-hidden className="block shrink-0">
+    <div className="flex shrink-0 items-center gap-2 sm:gap-[11px]" role="img" aria-label="Visit Tórshavn">
+      <svg viewBox="0 0 150 165" width="56" height="61.6" aria-hidden className="block h-[48px] w-auto shrink-0 sm:h-[62px]">
         <g fill="none" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="72" cy="66" r="50" />
           <path d="M2 120c8-7 15-7 23 0s15 7 23 0" />
@@ -231,7 +232,7 @@ function VisitTorshavn() {
           <rect x="114" y="144" width="18" height="18" rx="9" fill="#070E15" />
         </g>
       </svg>
-      <span className="flex flex-col whitespace-nowrap font-display text-[19px] font-medium leading-[1.05] tracking-[-.01em] text-ink">
+      <span className="flex flex-col whitespace-nowrap font-display text-[15.5px] font-medium leading-[1.05] tracking-[-.01em] text-ink sm:text-[19px]">
         <span>Visit</span>
         <span>Tórshavn</span>
       </span>
