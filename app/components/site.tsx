@@ -4,8 +4,8 @@
  * 1280px canvas width on a wide screen and full-bleed on a phone.
  */
 import { Link, NavLink } from "react-router";
-import type { ReactNode } from "react";
-import { Calendar, Chevron, Phone, Pin } from "./icons";
+import { useEffect, useState, type ReactNode } from "react";
+import { Calendar, Chevron, Clock, Phone, Pin } from "./icons";
 import { cx } from "./ui";
 import { fmtDayTime, fmtRange } from "~/lib/format";
 import type { Trip } from "~/lib/trip";
@@ -46,8 +46,23 @@ export const WEBSHOP_URL = "https://rentabike.fo/shop/";
 
 export function Header({ variant = "site", right }: { variant?: "site" | "funnel"; right?: ReactNode }) {
   const home = variant === "site";
+  const [open, setOpen] = useState(false);
+
+  // The menu is a sheet over the page: freeze the page while it is up, and close on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const was = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.body.style.overflow = was;
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
   return (
-    <header className="bg-header">
+    <header className="relative z-40 bg-header">
       <Shell className={cx("flex items-center gap-4 px-5 md:px-8", home ? "py-[14px]" : "py-3")}>
         <Plaque size={home ? 34 : 30} />
         {home && (
@@ -69,15 +84,54 @@ export function Header({ variant = "site", right }: { variant?: "site" | "funnel
         <div className="ml-auto flex items-center gap-4">
           {right ?? (
             <>
-              <span className="hidden text-[14.5px] text-ink-soft md:inline">Open today {SHOP.hours}</span>
-              <a href={SHOP.phoneHref} className="inline-flex items-center gap-2 rounded-full bg-white/9 px-[17px] py-[9px] text-[14.5px] font-semibold hover:bg-white/14">
-                <Phone size={15} />
-                <span className="num">{SHOP.phone}</span>
-              </a>
+              <span className="hidden text-[14.5px] text-ink-soft lg:inline">Open today {SHOP.hours}</span>
+              {/* the menu button, on screens too narrow for the links */}
+              <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
+                aria-controls="site-menu"
+                aria-label={open ? "Close the menu" : "Open the menu"}
+                className="flex size-11 items-center justify-center rounded-full bg-white/9 hover:bg-white/14 lg:hidden"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+                </svg>
+              </button>
             </>
           )}
         </div>
       </Shell>
+
+      {/* the mobile menu: the same four links, then how to reach the shop */}
+      {home && open && (
+        <div id="site-menu" className="fixed inset-x-0 bottom-0 top-[62px] z-40 overflow-y-auto bg-ground lg:hidden">
+          <Shell className="flex flex-col px-5 pb-10 pt-3">
+            <nav className="flex flex-col">
+              {NAV.map((n) => (
+                <NavLink key={n.to} to={n.to} onClick={() => setOpen(false)} className={({ isActive }) => cx("border-b border-white/7 py-[18px] text-[22px] font-semibold tracking-[-.01em]", isActive ? "text-brand-bright" : "text-ink")}>
+                  {n.label}
+                </NavLink>
+              ))}
+              <a href={WEBSHOP_URL} className="border-b border-white/7 py-[18px] text-[22px] font-semibold tracking-[-.01em] text-ink">
+                Webshop <span aria-hidden className="text-ink-mute">↗</span>
+              </a>
+            </nav>
+            <div className="mt-7 flex flex-col gap-3">
+              <a href={SHOP.phoneHref} className="inline-flex items-center justify-center gap-[10px] rounded-full bg-white px-6 py-[15px] text-[16px] font-bold text-night">
+                <Phone size={17} />
+                <span className="num">Call {SHOP.phone}</span>
+              </a>
+              <span className="inline-flex items-center gap-[10px] px-1 text-[14.5px] text-ink-soft">
+                <Clock size={16} className="text-brand-bright" /> Open today {SHOP.hours}
+              </span>
+              <span className="inline-flex items-center gap-[10px] px-1 text-[14.5px] text-ink-soft">
+                <Pin size={16} className="text-brand-bright" /> {SHOP.address}, Tórshavn
+              </span>
+            </div>
+          </Shell>
+        </div>
+      )}
     </header>
   );
 }
