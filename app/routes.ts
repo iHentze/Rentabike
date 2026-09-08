@@ -11,8 +11,6 @@ export default [
   route("tours", "routes/tours.tsx"),
   route("tours/:slug", "routes/tours.$slug.tsx"),
   route("booking", "routes/booking.tsx"),
-  // The booking guide, for the customer who is not sure what happens next.
-  route("how-to-book", "routes/how-to-book.tsx"),
   route("booked/:code", "routes/booked.$code.tsx"),
   route("booked/:code/calendar.ics", "routes/booked.$code.calendar[.]ics.ts"),
   // Card payment for a held booking, and ePay's notification about it.

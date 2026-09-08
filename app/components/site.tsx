@@ -38,7 +38,6 @@ export function Plaque({ size = 30 }: { size?: number }) {
 const NAV = [
   { to: "/bikes", label: "Rent a bike" },
   { to: "/tours", label: "Guided tours" },
-  { to: "/how-to-book", label: "How to book" },
   { to: "/booking", label: "My booking" },
 ];
 
@@ -104,7 +103,7 @@ export function Header({ variant = "site", right }: { variant?: "site" | "funnel
         </div>
       </Shell>
 
-      {/* the mobile menu: the same five links, then how to reach the shop */}
+      {/* the mobile menu: the same four links, then how to reach the shop */}
       {home && open && (
         <div id="site-menu" className="fixed inset-x-0 bottom-0 top-[62px] z-40 overflow-y-auto bg-ground lg:hidden">
           <Shell className="flex flex-col px-5 pb-10 pt-3">
