@@ -36,6 +36,13 @@
       "when": 1788828851446,
       "tag": "0004_addon_images",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788832241157,
+      "tag": "0005_payments_admin",
+      "breakpoints": true
     }
   ]
 }

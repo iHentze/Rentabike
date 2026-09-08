@@ -160,6 +160,8 @@ export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 export const INVENTORY_HOLDING_STATUSES: readonly BookingStatus[] = ["held", "confirmed", "picked_up"];
 
 export const BOOKING_KINDS = ["rental", "tour"] as const;
+export const PAYMENT_METHODS = ["shop", "card"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const BOOKING_CHANNELS = ["web", "counter", "phone", "reseller"] as const;
 
 export const bookings = sqliteTable(
@@ -185,6 +187,13 @@ export const bookings = sqliteTable(
     currency: text("currency").notNull().default("DKK"),
     /** Rule B5 — set when status becomes `held`; the sweeper releases past it. */
     holdExpiresAt: integer("hold_expires_at", { mode: "timestamp_ms" }),
+    /** How the customer pays: online by card, or at the counter when they collect. */
+    paymentMethod: text("payment_method", { enum: PAYMENT_METHODS }).notNull().default("shop"),
+    /** What the card has authorised or captured so far, and what went back — the money view of `payments`. */
+    paidMinor: integer("paid_minor").notNull().default(0),
+    refundedMinor: integer("refunded_minor").notNull().default(0),
+    /** Staff-only notes: the counter's own words, never shown to the customer. */
+    staffNotes: text("staff_notes"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -433,8 +442,13 @@ export const payments = sqliteTable(
       .references(() => bookings.id, { onDelete: "cascade" }),
     provider: text("provider").notNull().default("epay"),
     sessionId: text("session_id"),
+    /** The provider's transaction once the card is authorised — what capture, refund and void address. */
+    transactionId: text("transaction_id"),
     status: text("status", { enum: PAYMENT_STATUSES }).notNull().default("pending"),
     amountMinor: integer("amount_minor").notNull(),
+    /** How much of `amountMinor` has been captured, and how much refunded. */
+    capturedMinor: integer("captured_minor").notNull().default(0),
+    refundedMinor: integer("refunded_minor").notNull().default(0),
     currency: text("currency").notNull().default("DKK"),
     /** Provider event id — idempotency key for webhooks. */
     eventId: text("event_id"),

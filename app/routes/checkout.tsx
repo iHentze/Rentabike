@@ -13,6 +13,8 @@ import { basketHeaders, clearBasketHeaders, nextStep, ownBikeOnly, readBasket, r
 import { fitsRider, getAddonsById, getBikesById, listBikes } from "~/lib/catalogue/bikes";
 import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { priceBasket } from "~/lib/quote-basket";
+import { epayConfigured } from "~/lib/payments/epay";
+import { sendConfirmation, originOf } from "~/lib/email/send";
 import { listLocations } from "~/lib/booking/lookup";
 import { reserveBooking } from "~/lib/booking/reserve";
 import { transition } from "~/lib/booking/lifecycle";
@@ -77,6 +79,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     pickupId: basket.pickupLocationId ?? null,
     dropoffId: basket.dropoffLocationId ?? null,
     autoSwap: basket.autoSwap ?? false,
+    cardPay: epayConfigured(env),
     riders: basket.riders.map((r, i) => {
       const bike = r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined;
       return {
@@ -109,7 +112,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 }
 
 export async function action({ context, request }: Route.ActionArgs) {
-  const { env } = context.get(cloudflareContext);
+  const { env, ctx } = context.get(cloudflareContext);
   const url = new URL(request.url);
   const { trip, tour } = await resolveTrip(env.DB, url.searchParams);
   const form = await request.formData();
@@ -210,15 +213,20 @@ export async function action({ context, request }: Route.ActionArgs) {
     }
   }
 
-  // Pay at the shop: nothing to authorise, so the hold becomes a confirmed booking now.
-  await transition(env.DB, { bookingId: result.bookingId, from: "held", to: "confirmed", actor: "customer", note: "pay on collection" });
   const q = new URLSearchParams();
   if (swapped.length) q.set("swapped", swapped.join("→"));
+  if (epayConfigured(env) && form.get("pay") === "card" && result.totalMinor > 0) {
+    // The hold stands while the card is typed; /pay confirms once ePay says the money is there.
+    return redirect(`/pay/${result.code}${q.size ? `?${q}` : ""}`, { headers: await clearBasketHeaders() });
+  }
+  // Pay at the shop: nothing to authorise, so the hold becomes a confirmed booking now.
+  await transition(env.DB, { bookingId: result.bookingId, from: "held", to: "confirmed", actor: "customer", note: "pay on collection" });
+  ctx.waitUntil(sendConfirmation(env, result.bookingId, originOf(request)));
   return redirect(`/booked/${result.code}${q.size ? `?${q}` : ""}`, { headers: await clearBasketHeaders() });
 }
 
 export default function Checkout({ loaderData }: Route.ComponentProps) {
-  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error, addons, ownBike, helmetMissing, unfinished } = loaderData;
+  const { tour, seatLine, trip: t, days, deadline, locations, pickupId, dropoffId, autoSwap, cardPay, riders, extras, addonLines, fees, totalMinor, ready, lost, alternatives, error, addons, ownBike, helmetMissing, unfinished } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const here = tripHref("/checkout", trip);
   const dropoff = locations.find((l) => l.id === dropoffId);
@@ -463,20 +471,30 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
                 <h2 className="text-[20px] font-semibold tracking-[-.014em]">How would you like to pay?</h2>
                 <span className="inline-flex items-center gap-[6px] text-[13px] font-semibold text-ok"><Check size={14} /> Card details never touch our servers</span>
               </div>
-              <label className="flex cursor-pointer items-center gap-3 rounded-[16px] bg-brand/14 p-4 shadow-[inset_0_0_0_2px_#0A78D6]">
-                <input type="radio" name="pay" value="collect" defaultChecked className="size-[18px] accent-brand" />
+              <label className={cx("flex cursor-pointer items-center gap-3 rounded-[16px] p-4", cardPay ? "bg-white/5 has-[:checked]:bg-brand/14 has-[:checked]:shadow-[inset_0_0_0_2px_#0A78D6]" : "bg-brand/14 shadow-[inset_0_0_0_2px_#0A78D6]")}>
+                <input type="radio" name="pay" value="collect" defaultChecked={!cardPay} className="size-[18px] accent-brand" />
                 <div className="flex flex-col gap-[2px]">
                   <span className="text-[15.5px] font-semibold">Pay when you collect</span>
                   <span className="text-[13.5px] text-ink-soft">Card or cash at {SHOP.address}. We hold the bikes for you now.</span>
                 </div>
               </label>
-              <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-4 opacity-70">
-                <div className="size-[18px] rounded-full border-2 border-ink-dim" />
-                <div className="flex flex-col gap-[2px]">
-                  <span className="inline-flex items-center gap-2 text-[15.5px] font-semibold"><CardIcon size={16} /> Pay now by card</span>
-                  <span className="text-[13.5px] text-ink-mute">Visa, Mastercard and Dankort — online payment switches on with the new site.</span>
+              {cardPay ? (
+                <label className="flex cursor-pointer items-center gap-3 rounded-[16px] bg-white/5 p-4 has-[:checked]:bg-brand/14 has-[:checked]:shadow-[inset_0_0_0_2px_#0A78D6]">
+                  <input type="radio" name="pay" value="card" defaultChecked className="size-[18px] accent-brand" />
+                  <div className="flex flex-col gap-[2px]">
+                    <span className="inline-flex items-center gap-2 text-[15.5px] font-semibold"><CardIcon size={16} /> Pay now by card</span>
+                    <span className="text-[13.5px] text-ink-soft">Visa, Mastercard and Dankort through ePay. Free cancellation until 48 hours before.</span>
+                  </div>
+                </label>
+              ) : (
+                <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-4 opacity-70">
+                  <div className="size-[18px] rounded-full border-2 border-ink-dim" />
+                  <div className="flex flex-col gap-[2px]">
+                    <span className="inline-flex items-center gap-2 text-[15.5px] font-semibold"><CardIcon size={16} /> Pay now by card</span>
+                    <span className="text-[13.5px] text-ink-mute">Visa, Mastercard and Dankort — online payment switches on with the new site.</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
 
             <label className="flex cursor-pointer gap-3 rounded-card bg-card px-[18px] py-4">

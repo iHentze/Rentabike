@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local development (gitignored).
+APP_ENV=development
+# Staff login for /admin. In production set it as a secret: wrangler secret put ADMIN_PASSWORD
+ADMIN_PASSWORD=counter
+# Card payments switch on when both are set. Test keys from the ePay dashboard.
+# EPAY_API_KEY=test_...
+# EPAY_POS_ID=...
+# Point the client at a stand-in server for local end-to-end runs (scripts/fake-epay.mjs).
+# EPAY_BASE_URL=http://localhost:8790

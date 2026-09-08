@@ -29,9 +29,20 @@
   // Rule B5: held bookings expire after 30 minutes. The sweeper runs every 5.
   "triggers": { "crons": ["*/5 * * * *"] },
 
+  // Transactional email through Cloudflare Email Service. Without the binding
+  // the app still runs; emails are logged instead of sent (app/lib/email/mailer.ts).
+  // The sending domain (rentabike.fo) must be onboarded to Email Service first.
+  "send_email": [{ "name": "EMAIL" }],
+
   // Deployed values. Local dev overrides these from .dev.vars (gitignored).
   "vars": {
     "APP_ENV": "production",
-    "HOLD_TTL_MINUTES": "30"
+    "HOLD_TTL_MINUTES": "30",
+    // "instant" charges the card at booking; "pickup" authorises and the counter captures.
+    "EPAY_CAPTURE": "instant",
+    "EMAIL_FROM": "Rent a Bike & Outdoor <booking@rentabike.fo>",
+    "EMAIL_REPLY_TO": "rentabike@rentabike.fo"
+    // Secrets, set with `wrangler secret put`: ADMIN_PASSWORD, EPAY_API_KEY, EPAY_POS_ID.
+    // Optional: ACCESS_TEAM_DOMAIN + ACCESS_AUD (Cloudflare Access on /admin), EPAY_BASE_URL (tests).
   }
 }

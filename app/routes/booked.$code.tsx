@@ -60,6 +60,11 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
               <span className="num font-display text-[56px] font-bold leading-none tracking-[.06em] md:text-[76px]">{booking.code}</span>
               <h1 className="font-display text-[26px] font-semibold tracking-[-.016em] text-white/90">{live ? `You're booked, ${first}` : `${first}, this booking is ${STATUS_LABEL[booking.status]?.toLowerCase() ?? booking.status}`}</h1>
             </div>
+            {booking.status === "held" && (
+              <a href={`/pay/${booking.code}`} className="inline-flex items-center gap-[9px] rounded-full bg-ok px-7 py-[14px] text-[16px] font-bold text-ok-ink hover:brightness-110">
+                Pay {formatDKKCode(booking.totalMinor)} by card
+              </a>
+            )}
             <div className="flex flex-wrap justify-center gap-3 pt-[6px]">
               <a href={`/booked/${booking.code}/calendar.ics`} className="inline-flex items-center gap-[9px] rounded-full bg-white px-6 py-[13px] text-[15px] font-bold text-night hover:bg-ink-pale">
                 <Calendar size={18} /> Add to calendar
@@ -87,7 +92,16 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
           <div className="flex flex-col gap-3">
             <Lbl>What happens next</Lbl>
             <Card className="px-2 py-[6px]">
-              <Row icon={<span className="text-[14px] font-bold">1</span>} iconTone="brand" title="We email your confirmation" sub={`Within a few minutes, to ${booking.customerEmail}, with directions to the shop.`} />
+              <Row
+                icon={<span className="text-[14px] font-bold">1</span>}
+                iconTone="brand"
+                title={booking.status === "held" ? "Pay by card to confirm" : "We email your confirmation"}
+                sub={
+                  booking.status === "held"
+                    ? `The bikes are held for you${booking.holdExpiresAt ? ` until ${fmtTime(booking.holdExpiresAt)}` : ""}. Nothing is charged yet.`
+                    : `Within a few minutes, to ${booking.customerEmail}, with a calendar file. ${booking.paymentMethod === "card" ? `Paid by card: ${formatDKKCode(booking.paidMinor)}.` : `${formatDKKCode(booking.totalMinor)} to pay when you collect — card or cash.`}`
+                }
+              />
               <div className="hairline mx-[14px]" />
               <Row icon={<span className="text-[14px] font-bold">2</span>} iconTone="brand" title={`${booking.pickupName ?? SHOP.address}, ${fmtLongDay(booking.startAt)} ${fmtTime(booking.startAt)}`} sub={booking.pickupNote ?? "Bring the code and something with your name on it. Ten minutes for fitting."} />
               <div className="hairline mx-[14px]" />

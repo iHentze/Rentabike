@@ -13,6 +13,18 @@ export default [
   route("booking", "routes/booking.tsx"),
   route("booked/:code", "routes/booked.$code.tsx"),
   route("booked/:code/calendar.ics", "routes/booked.$code.calendar[.]ics.ts"),
+  // Card payment for a held booking, and ePay's notification about it.
+  route("pay/:code", "routes/pay.$code.tsx"),
+  route("api/epay/webhook", "routes/api.epay.webhook.ts"),
+  // The counter — staff only, see app/lib/admin/auth.ts.
+  route("admin", "routes/admin/layout.tsx", [
+    index("routes/admin/today.tsx"),
+    route("login", "routes/admin/login.tsx"),
+    route("logout", "routes/admin/logout.ts"),
+    route("bookings", "routes/admin/bookings.tsx"),
+    route("bookings/:id", "routes/admin/booking.tsx"),
+    route("stock", "routes/admin/stock.tsx"),
+  ]),
   route("health", "routes/health.ts"),
   // Catalogue photos, fetched from the shop by the Worker and cached at the edge.
   route("img/*", "routes/img.ts"),
