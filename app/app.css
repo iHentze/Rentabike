@@ -99,6 +99,13 @@
   html {
     color-scheme: dark;
     background: var(--color-ground);
+    /*
+     * The page never scrolls sideways. Anything wider than the phone is a bug
+     * to fix, not a direction to drag in; wide tables and strips scroll inside
+     * their own overflow-x-auto containers. Set on html so it propagates to the
+     * viewport and position: sticky keeps working.
+     */
+    overflow-x: hidden;
   }
   body {
     font-family: var(--font-sans);
