@@ -19,7 +19,7 @@ export type PillSize = "sm" | "md" | "lg";
 
 const TONE: Record<PillTone, string> = {
   primary: "bg-white text-night font-bold hover:bg-ink-pale",
-  ghost: "bg-white/9 text-ink font-semibold hover:bg-white/14",
+  ghost: "bg-white/12 text-ink font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,.1)] hover:bg-white/16",
   brand: "bg-brand text-ink font-bold hover:bg-brand-bright",
   disabled: "bg-white/7 text-ink-dim font-bold cursor-not-allowed",
 };
@@ -139,7 +139,7 @@ export function Amount({ minor, className }: { minor: number; className?: string
 
 // --- form fields -----------------------------------------------------------
 
-const FIELD = "w-full rounded-field bg-white/7 px-[15px] py-[13px] text-[15.5px] text-ink placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright";
+const FIELD = "w-full rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[15.5px] text-ink placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright";
 
 export function Field({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) {
   return (

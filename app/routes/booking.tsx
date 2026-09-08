@@ -99,11 +99,11 @@ export default function MyBooking({ loaderData, actionData }: Route.ComponentPro
           <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
             <label className="flex flex-col gap-[7px]">
               <Lbl>Code</Lbl>
-              <input name="code" defaultValue={code} required minLength={6} maxLength={7} autoCapitalize="characters" placeholder="A7F3C2" className="num rounded-field bg-white/7 px-[15px] py-[13px] text-[16px] font-bold tracking-[.12em] uppercase placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-dim focus:outline-2 focus:outline-brand-bright" />
+              <input name="code" defaultValue={code} required minLength={6} maxLength={7} autoCapitalize="characters" placeholder="A7F3C2" className="num rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[16px] font-bold tracking-[.12em] uppercase placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright" />
             </label>
             <label className="flex flex-col gap-[7px]">
               <Lbl>Email</Lbl>
-              <input name="email" type="email" defaultValue={email} required className="rounded-field bg-white/7 px-[15px] py-[13px] text-[15.5px] focus:outline-2 focus:outline-brand-bright" />
+              <input name="email" type="email" defaultValue={email} required className="rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[15.5px] focus:outline-2 focus:outline-brand-bright" />
             </label>
             <button className="self-end rounded-full bg-white px-6 py-[13px] text-[15px] font-bold text-night hover:bg-ink-pale">Find it</button>
           </div>

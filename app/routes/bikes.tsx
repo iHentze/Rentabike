@@ -149,7 +149,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
           <div className="flex flex-col gap-3 border-t border-white/6 pt-5">
             <Lbl>Rider height</Lbl>
             <div className="flex items-center gap-2">
-              <input type="number" name="height" min={100} max={220} placeholder="cm" defaultValue={height ?? ""} className="num w-full rounded-field bg-white/7 px-[13px] py-[9px] text-[15px] focus:outline-2 focus:outline-brand-bright" />
+              <input type="number" name="height" min={100} max={220} placeholder="cm" defaultValue={height ?? ""} className="num w-full rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[13px] py-[9px] text-[15px] focus:outline-2 focus:outline-brand-bright" />
               <button className="rounded-full bg-white/9 px-4 py-[9px] text-[13.5px] font-semibold hover:bg-white/14">Fit</button>
             </div>
             <span className="text-[12.5px] leading-[1.5] text-ink-mute">Every frame lists the rider height it suits. Between two sizes, take the smaller.</span>

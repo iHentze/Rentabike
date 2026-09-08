@@ -382,19 +382,19 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-[7px]">
                   <Lbl>Full name</Lbl>
-                  <input name="name" required minLength={2} autoComplete="name" className="rounded-field bg-white/7 px-[15px] py-[13px] text-[15.5px] focus:outline-2 focus:outline-brand-bright" />
+                  <input name="name" required minLength={2} autoComplete="name" className="rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[15.5px] focus:outline-2 focus:outline-brand-bright" />
                 </label>
                 <label className="flex flex-col gap-[7px]">
                   <Lbl>Phone</Lbl>
-                  <input name="phone" type="tel" autoComplete="tel" placeholder="+298" className="num rounded-field bg-white/7 px-[15px] py-[13px] text-[15.5px] placeholder:text-ink-dim focus:outline-2 focus:outline-brand-bright" />
+                  <input name="phone" type="tel" autoComplete="tel" placeholder="+298" className="num rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[15.5px] placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright" />
                 </label>
                 <label className="flex flex-col gap-[7px] sm:col-span-2">
                   <Lbl>Email — confirmation and pickup code go here</Lbl>
-                  <input name="email" type="email" required autoComplete="email" className="rounded-field bg-white/7 px-[15px] py-[13px] text-[15.5px] focus:outline-2 focus:outline-brand-bright" />
+                  <input name="email" type="email" required autoComplete="email" className="rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[15.5px] focus:outline-2 focus:outline-brand-bright" />
                 </label>
                 <label className="flex flex-col gap-[7px] sm:col-span-2">
                   <Lbl>Anything we should know? (optional)</Lbl>
-                  <textarea name="notes" rows={2} placeholder="Clip-in pedals, a child seat, arriving by ferry…" className="rounded-field bg-white/7 px-[15px] py-[13px] text-[15.5px] placeholder:text-ink-dim focus:outline-2 focus:outline-brand-bright" />
+                  <textarea name="notes" rows={2} placeholder="Clip-in pedals, a child seat, arriving by ferry…" className="rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] text-[15.5px] placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright" />
                 </label>
               </div>
             </Card>
@@ -414,7 +414,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
                 <label className="flex flex-col gap-[7px]">
                   <Lbl>Collect from</Lbl>
                   <div className="relative">
-                    <select name="pickup" defaultValue={pickupId ?? ""} onChange={() => document.getElementById("update-locations")?.click()} className="w-full appearance-none rounded-field bg-white/7 px-[15px] py-[13px] pr-10 text-[15.5px] focus:outline-2 focus:outline-brand-bright">
+                    <select name="pickup" defaultValue={pickupId ?? ""} onChange={() => document.getElementById("update-locations")?.click()} className="w-full appearance-none rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] pr-10 text-[15.5px] focus:outline-2 focus:outline-brand-bright">
                       {locations.map((l) => (
                         <option key={l.id} value={l.id} className="bg-card">
                           {l.name} · {fmtTime(trip.startAt)}{l.pickupFeeMinor > 0 ? ` · +${formatDKKCode(l.pickupFeeMinor)}` : ""}
@@ -427,7 +427,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
                 <label className="flex flex-col gap-[7px]">
                   <Lbl>Return to</Lbl>
                   <div className="relative">
-                    <select name="dropoff" defaultValue={dropoffId ?? ""} onChange={() => document.getElementById("update-locations")?.click()} className="w-full appearance-none rounded-field bg-white/7 px-[15px] py-[13px] pr-10 text-[15.5px] focus:outline-2 focus:outline-brand-bright">
+                    <select name="dropoff" defaultValue={dropoffId ?? ""} onChange={() => document.getElementById("update-locations")?.click()} className="w-full appearance-none rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[13px] pr-10 text-[15.5px] focus:outline-2 focus:outline-brand-bright">
                       {locations.map((l) => (
                         <option key={l.id} value={l.id} className="bg-card">
                           {l.name} · {fmtTime(trip.endAt)}{l.dropoffFeeMinor > 0 ? ` · +${formatDKKCode(l.dropoffFeeMinor)}` : ""}
