@@ -29,7 +29,7 @@ export function Shell({ children, className }: { children: ReactNode; className?
 /** The white plaque keeps the logo's real brand blue on the dark ground. */
 export function Plaque({ size = 30 }: { size?: number }) {
   return (
-    <Link to="/" className="inline-flex shrink-0 items-center rounded-plaque bg-white px-[9px] py-[5px]" aria-label={SHOP.name}>
+    <Link to="/" className="inline-flex shrink-0 items-center rounded-plaque bg-white px-[5px] py-[2px]" aria-label={SHOP.name}>
       <img src="/images/logo.png" alt="" style={{ height: size }} className="block w-auto" />
     </Link>
   );
