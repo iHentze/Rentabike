@@ -238,6 +238,7 @@ export interface CatalogueAddon {
   unit: "per_bike" | "per_bike_per_day" | "per_booking";
   priceMinor: number;
   isSale: boolean;
+  image: string | null;
 }
 
 /** Add-ons by id — the allowlist of one product, or everything in a basket. */
@@ -245,10 +246,10 @@ export async function getAddonsById(d1: D1Database, ids: readonly string[]): Pro
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();
   const rows = await d1
-    .prepare(`SELECT id, slug, name, unit, price_minor, is_sale FROM addons WHERE id IN (${unique.map((_, i) => `?${i + 1}`).join(", ")}) ORDER BY price_minor, name`)
+    .prepare(`SELECT id, slug, name, unit, price_minor, is_sale, image FROM addons WHERE id IN (${unique.map((_, i) => `?${i + 1}`).join(", ")}) ORDER BY price_minor, name`)
     .bind(...unique)
-    .all<{ id: string; slug: string; name: string; unit: CatalogueAddon["unit"]; price_minor: number; is_sale: number }>();
-  return new Map((rows.results ?? []).map((a) => [a.id, { id: a.id, slug: a.slug, name: a.name, unit: a.unit, priceMinor: a.price_minor, isSale: Boolean(a.is_sale) }]));
+    .all<{ id: string; slug: string; name: string; unit: CatalogueAddon["unit"]; price_minor: number; is_sale: number; image: string | null }>();
+  return new Map((rows.results ?? []).map((a) => [a.id, { id: a.id, slug: a.slug, name: a.name, unit: a.unit, priceMinor: a.price_minor, isSale: Boolean(a.is_sale), image: a.image }]));
 }
 
 export const ADDON_UNIT_LABEL: Record<CatalogueAddon["unit"], string> = {

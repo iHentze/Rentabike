@@ -57,7 +57,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   ]);
   const addons = [...allAddons.values()]
     .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
-    .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 }));
+    .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, image: a.image, qty: basket.addons[a.id] ?? 0 }));
   const soFar = priced.quote?.totalMinor ?? 0;
   const pickup = locations.find((l) => l.id === basket.pickupLocationId)?.name ?? null;
   const dropoff = locations.find((l) => l.id === basket.dropoffLocationId)?.name ?? null;

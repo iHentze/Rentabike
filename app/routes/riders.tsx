@@ -6,8 +6,9 @@ import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
 import { BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { FunnelSteps } from "~/components/funnel-steps";
-import { Check, Info, Minus, Plus } from "~/components/icons";
-import { AddonsPanel, HELMET_ID, unitLabel } from "~/components/addons-panel";
+import { Check, Info } from "~/components/icons";
+import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
+import { AddonCard } from "~/components/addon-card";
 import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
 import { assignBike, basketHeaders, nextStep, readBasket, riderLabel, ridersOn, stepHref, unassignBike, type Basket } from "~/lib/basket";
@@ -15,6 +16,7 @@ import { fitsRider, getAddonsById, listBikes, ridable, type CatalogueAddon } fro
 import { priceBasket } from "~/lib/quote-basket";
 import { fmtDays, fmtLongDay, fmtTime } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
+import { imageSrc } from "~/lib/catalogue/images";
 
 export function meta({ loaderData }: Route.MetaArgs) {
   return [{ title: loaderData?.step === "extras" ? `Extras for ${loaderData.riders[loaderData.current]?.label ?? "the rider"} — Rent a Bike & Outdoor` : "A bike for each rider — Rent a Bike & Outdoor" }];
@@ -121,8 +123,8 @@ export async function loader({ context, request }: Route.LoaderArgs) {
       };
     }),
     candidates: candidates.map((b) => ({ id: b.id, slug: b.slug, name: b.name, category: b.category, image: b.image, sizeLabel: b.sizeLabel, riderMinCm: b.riderMinCm, riderMaxCm: b.riderMaxCm, free: b.freeForRider, rateMinor: b.rateMinor, perDay: b.perDay, mine: rider.bikeTypeId === b.id, ranged: b.ranged })),
-    mine: mine.map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: rider.addons[a.id] ?? 0 })),
-    forEveryone: forEveryone.map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 })),
+    mine: mine.map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, image: a.image, qty: rider.addons[a.id] ?? 0 })),
+    forEveryone: forEveryone.map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, image: a.image, qty: basket.addons[a.id] ?? 0 })),
     copyFrom,
     after: afterMe ? { ...afterMe, label: labels[afterMe.rider]! } : null,
     extras: Object.entries(basket.extras).map(([id, qty]) => ({ id, name: bikes.find((b) => b.id === id)?.name ?? id, qty, totalMinor: (bikes.find((b) => b.id === id)?.tripMinor ?? 0) * qty })),
@@ -382,7 +384,14 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
               {helmet && !tour && (
                 <Card className={cx("flex flex-col gap-4 p-[22px]", helmet.qty > 0 ? "shadow-[inset_0_0_0_1.5px_rgba(46,212,122,.55)]" : "bg-[linear-gradient(rgba(255,176,32,.07),rgba(255,176,32,.07))] shadow-[inset_0_0_0_1.5px_rgba(255,176,32,.55)]")}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-[20px] font-semibold tracking-[-.014em]">Does {first} want a helmet?</h2>
+                    <span className="flex items-center gap-4">
+                      {helmet.image && (
+                        <span className="relative hidden h-[64px] w-[88px] shrink-0 overflow-hidden rounded-plaque bg-white p-1 sm:block">
+                          <img src={imageSrc(helmet.image) ?? undefined} alt="" className="absolute inset-0 size-full object-scale-down p-[inherit]" />
+                        </span>
+                      )}
+                      <h2 className="text-[20px] font-semibold tracking-[-.014em]">Does {first} want a helmet?</h2>
+                    </span>
                     {helmet.qty > 0 ? (
                       <span className="rounded-full bg-ok/16 px-3 py-[5px] text-[12px] font-bold tracking-[.04em] text-ok">HELMET ADDED</span>
                     ) : (
@@ -427,41 +436,9 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                   <span className="text-[13.5px] text-ink-mute">Only what fits this bike · prices for the whole rental</span>
                 </div>
                 {rest.length > 0 ? (
-                  <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)] gap-[14px] md:grid-cols-2">
                     {rest.map((a) => (
-                      <div key={a.id} className={cx("flex items-center gap-3 rounded-field px-[14px] py-[13px]", a.qty > 0 ? "bg-brand/18 shadow-[inset_0_0_0_1.5px_#0A78D6]" : "bg-white/5")}>
-                        <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-                          <span className="text-[14.5px] font-semibold leading-[1.25]">{shortName(a.name)}</span>
-                          <span className={cx("num text-[12.5px]", a.qty > 0 ? "font-semibold text-brand-bright" : "text-ink-mute")}>
-                            {formatDKKCode(a.priceMinor)}
-                            {a.unit === "per_bike_per_day" && ` ${unitLabel(a.unit)}`}
-                            {a.isSale && " · yours to keep"}
-                          </span>
-                        </div>
-                        <Form method="post" action={here} className="flex shrink-0 items-center gap-1">
-                          <input type="hidden" name="intent" value="raddon" />
-                          <input type="hidden" name="r" value={current} />
-                          <input type="hidden" name="step" value="extras" />
-                          <input type="hidden" name="addon" value={a.id} />
-                          {a.qty > 0 ? (
-                            <>
-                              <button name="delta" value="-1" aria-label={`Remove ${a.name}`} className="flex size-8 items-center justify-center rounded-full bg-white/8 hover:bg-white/14">
-                                <Minus size={13} />
-                              </button>
-                              <span className="num inline-flex items-center gap-[5px] rounded-full bg-ok/16 px-[11px] py-[6px] text-[13px] font-bold text-ok">
-                                <Check size={12} strokeWidth={3.4} /> {a.qty > 1 ? `${a.qty} added` : "Added"}
-                              </span>
-                              <button name="delta" value="1" aria-label={`Add another ${a.name}`} disabled={a.qty >= MAX_PER_RIDER} className="flex size-8 items-center justify-center rounded-full bg-white/8 hover:bg-white/14 disabled:opacity-30">
-                                <Plus size={13} />
-                              </button>
-                            </>
-                          ) : (
-                            <button name="delta" value="1" className="rounded-full bg-white/10 px-[14px] py-[7px] text-[13px] font-semibold hover:bg-white/14">
-                              Add
-                            </button>
-                          )}
-                        </Form>
-                      </div>
+                      <AddonCard key={a.id} addon={a} action={here} intent="raddon" hidden={{ r: current, step: "extras" }} forLabel={first} max={MAX_PER_RIDER} />
                     ))}
                   </div>
                 ) : (

@@ -48,12 +48,12 @@ export async function writeCatalogue(d1: D1Database, cat: ParsedCatalogue, now: 
     stmts.push(
       d1
         .prepare(
-          `INSERT INTO addons (id, slug, name, unit, price_minor, is_sale)
-           VALUES (?1,?2,?3,?4,?5,?6)
+          `INSERT INTO addons (id, slug, name, unit, price_minor, is_sale, image)
+           VALUES (?1,?2,?3,?4,?5,?6,?7)
            ON CONFLICT(id) DO UPDATE SET name=excluded.name, unit=excluded.unit,
-             price_minor=excluded.price_minor, is_sale=excluded.is_sale`,
+             price_minor=excluded.price_minor, is_sale=excluded.is_sale, image=excluded.image`,
         )
-        .bind(`addon-${a.slug}`, a.slug, a.name, a.unit, a.priceMinor, a.isSale ? 1 : 0),
+        .bind(`addon-${a.slug}`, a.slug, a.name, a.unit, a.priceMinor, a.isSale ? 1 : 0, a.image ?? null),
     );
   }
 

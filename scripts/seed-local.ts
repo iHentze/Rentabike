@@ -27,8 +27,8 @@ const linkRows: string[] = [];
 
 for (const a of cat.addons.values()) {
   out.push(
-    `INSERT INTO addons (id, slug, name, unit, price_minor, is_sale) VALUES (${q(`addon-${a.slug}`)}, ${q(a.slug)}, ${q(a.name)}, ${q(a.unit)}, ${a.priceMinor}, ${a.isSale ? 1 : 0})` +
-      ` ON CONFLICT(id) DO UPDATE SET name=excluded.name, unit=excluded.unit, price_minor=excluded.price_minor, is_sale=excluded.is_sale;`,
+    `INSERT INTO addons (id, slug, name, unit, price_minor, is_sale, image) VALUES (${q(`addon-${a.slug}`)}, ${q(a.slug)}, ${q(a.name)}, ${q(a.unit)}, ${a.priceMinor}, ${a.isSale ? 1 : 0}, ${q(a.image ?? null)})` +
+      ` ON CONFLICT(id) DO UPDATE SET name=excluded.name, unit=excluded.unit, price_minor=excluded.price_minor, is_sale=excluded.is_sale, image=excluded.image;`,
   );
 }
 

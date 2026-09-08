@@ -50,7 +50,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   const addons = [...(await getAddonsById(env.DB, [...addonIds])).values()]
     .filter((a) => ownBike || a.unit === "per_booking" || basket.addons[a.id])
     .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
-    .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, qty: basket.addons[a.id] ?? 0 }));
+    .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, image: a.image, qty: basket.addons[a.id] ?? 0 }));
   const helmetMissing = tour || ownBike ? [] : basket.riders.map((r, i) => ({ r, i })).filter(({ r }) => r.bikeTypeId && !(r.addons[HELMET_ID] ?? 0)).map(({ i }) => ({ r: i, label: riderLabel(basket, i) }));
   const unfinished = nextStep(basket);
 
