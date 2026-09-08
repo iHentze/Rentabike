@@ -15,7 +15,8 @@
     "db:migrate:local": "wrangler d1 migrations apply rentabike --local",
     "db:migrate:remote": "wrangler d1 migrations apply rentabike --remote",
     "db:seed:local": "tsx scripts/seed-local.ts > .wrangler/seed.sql && wrangler d1 migrations apply rentabike --local && wrangler d1 execute rentabike --local --file=.wrangler/seed.sql",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "check:phone": "node scripts/phone-sweep.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
@@ -34,6 +35,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "drizzle-kit": "^0.31.10",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0",
