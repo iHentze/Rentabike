@@ -5,7 +5,7 @@ import { cloudflareContext } from "~/context";
 import { DateRangeCells } from "~/components/date-range";
 import { Footer, Header, SHOP, Shell } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Row, Tag, cx } from "~/components/ui";
-import { Bag, Bolt, CardIcon, Chevron, ChevronDown, Child, Gravel, Mountain, Pin, Road, Shield } from "~/components/icons";
+import { Bag, Bolt, CardIcon, Chevron, ChevronDown, Child, Gravel, Info, Mountain, Pin, Road, Shield } from "~/components/icons";
 import { MAX_RIDERS, readTrip, tripDays, tripHref, type Trip } from "~/lib/trip";
 import { faroeParts, fmtDuration } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
@@ -79,6 +79,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <p className="max-w-[520px] text-[18px] leading-[1.5] text-white/90 [text-shadow:0_1px_16px_rgba(7,14,21,.6)]">
               {fleetUnits} bikes in Tórshavn — road, gravel, mountain and electric. Out the door in ten minutes, from the shop on Sverrisgøta.
             </p>
+            {/* the guide, for anyone not sure what the white button leads to */}
+            <PillLink to="/how-to-book" tone="ghost" size="sm" className="self-start bg-ground/50 py-[9px] pl-[14px] backdrop-blur-[2px]">
+              <Info size={16} className="text-brand-bright" />
+              New here? How booking works
+            </PillLink>
           </div>
 
         </Shell>
