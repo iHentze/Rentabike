@@ -8,6 +8,16 @@
  * you can act on. Green = done/included, amber = attention, red = gone.
  */
 @layer base {
+  /*
+   * A grid with no explicit column gets one implicit `auto` column, which
+   * grows to its widest child instead of truncating — a long bike name then
+   * pushes the whole page wider than the phone. One column of minmax(0, 1fr)
+   * by default; every sm:/md: grid-cols utility still overrides it.
+   */
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   /* A hint in a field must be readable on a dark card, not a whisper. */
   input::placeholder,
   textarea::placeholder {

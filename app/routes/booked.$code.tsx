@@ -41,6 +41,7 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
   const seats = booking.lines.filter((l) => l.kind === "tour_seat");
   const others = booking.lines.filter((l) => l.kind === "addon" || l.kind === "fee");
   const live = booking.status === "confirmed" || booking.status === "held" || booking.status === "picked_up";
+  const pay = paymentWords(booking, deadline);
 
   return (
     <>
@@ -148,16 +149,14 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
             <div className="flex flex-col gap-3">
               <Lbl>Payment</Lbl>
               <Card className="flex flex-col gap-[13px] p-[18px]">
-                <div className="flex items-baseline justify-between">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="num font-display text-[30px] font-bold tracking-[-.02em]">{formatDKKCode(booking.totalMinor)}</span>
-                  <span className={cx("inline-flex items-center gap-[7px] rounded-full px-[13px] py-[6px] text-[12.5px] font-bold", booking.status === "confirmed" ? "bg-warn/16 text-warn" : "bg-ok/16 text-ok")}>
+                  <span className={cx("inline-flex items-center gap-[7px] whitespace-nowrap rounded-full px-[13px] py-[6px] text-[12.5px] font-bold", pay.tone === "warn" ? "bg-warn/16 text-warn" : pay.tone === "ok" ? "bg-ok/16 text-ok" : "bg-white/8 text-ink-soft")}>
                     <span className="size-[7px] rounded-full bg-current" />
-                    {booking.status === "confirmed" ? "Pay at the shop" : STATUS_LABEL[booking.status] ?? booking.status}
+                    {pay.chip}
                   </span>
                 </div>
-                <span className="text-[13px] leading-[1.55] text-ink-mute">
-                  Nothing has been charged. Pay by card or cash when you collect. Free cancellation until {fmtTime(deadline)} on {fmtLongDay(deadline)} — after that the booking is charged in full.
-                </span>
+                <span className="text-[13px] leading-[1.55] text-ink-mute">{pay.text}</span>
               </Card>
             </div>
           </div>
@@ -178,3 +177,14 @@ export default function Booked({ loaderData }: Route.ComponentProps) {
   );
 }
 
+/** The payment card: what has been charged, and what cancelling would mean now. */
+function paymentWords(b: { status: string; paymentMethod: "shop" | "card"; paidMinor: number; refundedMinor: number; totalMinor: number }, deadline: number): { chip: string; tone: "ok" | "warn" | "mute"; text: string } {
+  const now = Date.now();
+  const window = now < deadline ? `Free cancellation until ${fmtTime(deadline)} on ${fmtLongDay(deadline)} — after that the booking is charged in full.` : `The free-cancellation window closed ${fmtLongDay(deadline)} — a cancellation now is charged in full.`;
+  if (b.status === "held") return { chip: "Payment pending", tone: "warn", text: "Nothing is charged until the card goes through. The bikes are held meanwhile." };
+  if (b.status === "cancelled" || b.status === "expired" || b.status === "no_show") {
+    return { chip: STATUS_LABEL[b.status] ?? b.status, tone: "mute", text: b.refundedMinor > 0 ? `${formatDKKCode(b.refundedMinor)} has been refunded to the card.` : b.paidMinor > 0 ? "The card payment stands under our terms." : "Nothing was charged." };
+  }
+  if (b.paymentMethod === "card" && b.paidMinor > 0) return { chip: "Paid by card", tone: "ok", text: `${formatDKKCode(b.paidMinor)} paid by card through ePay. ${window.replace("charged in full", "not refunded")}` };
+  return { chip: b.status === "returned" ? "Settled at the shop" : "Pay at the shop", tone: b.status === "returned" ? "mute" : "warn", text: `Nothing has been charged. Pay by card or cash when you collect. ${window}` };
+}
