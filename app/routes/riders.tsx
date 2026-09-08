@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Form, Link, redirect } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Form, Link, data, redirect, useFetcher } from "react-router";
 import type { Route } from "./+types/riders";
 import { cloudflareContext } from "~/context";
 import { Footer, Header, SHOP, Shell, TripSummary } from "~/components/site";
@@ -212,6 +212,8 @@ export async function action({ context, request }: Route.ActionArgs) {
   }
 
   const headers = await basketHeaders(basket);
+  // Name and height save as they are typed; answering in place keeps the list where the customer is looking.
+  if (intent === "rider") return data(null, { headers });
   if (next === "checkout") return redirect(tripHref("/checkout", trip), { headers });
   const back = new URLSearchParams(url.searchParams);
   back.set("r", String(next.rider + 1));
@@ -263,26 +265,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
             <>
               {/* height */}
               <Card className="flex flex-col gap-[17px] p-[22px]">
-                <Form method="post" action={here} className="flex flex-col gap-[17px]">
-                  <input type="hidden" name="intent" value="rider" />
-                  <input type="hidden" name="r" value={current} />
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 className="text-[19px] font-semibold tracking-[-.012em]">{me.name ? `How tall is ${me.name}?` : `Who is rider ${current + 1}, and how tall?`}</h2>
-                    <span className="text-[14px] text-ink-mute">We'll pick the frame</span>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col gap-[7px]">
-                      <Lbl>Name (optional)</Lbl>
-                      <input name="name" defaultValue={me.name} placeholder={`Rider ${current + 1}`} className="rounded-field bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] px-[15px] py-[12px] text-[15.5px] placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright" />
-                    </label>
-                    <HeightField value={me.heightCm ?? null} />
-                    <button className="justify-self-start rounded-full bg-white/12 px-6 py-[12px] text-[15px] font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,.1)] hover:bg-white/16 sm:col-span-2">Save</button>
-                  </div>
-                </Form>
-                <div className="flex gap-[11px] rounded-field bg-white/5 px-[15px] py-[13px]">
-                  <Info size={17} className="mt-[2px] shrink-0 text-brand-bright" />
-                  <span className="text-[14px] leading-[1.55] text-ink-soft">Between two sizes? Take the smaller one — you'll be more comfortable on the descents. We adjust the seat post at pickup either way, and you can swap the bike in the first hour if it's wrong.</span>
-                </div>
+                <RiderForm key={current} here={here} current={current} name={me.name} heightCm={me.heightCm ?? null} />
               </Card>
 
               {/* bikes */}
@@ -539,10 +522,66 @@ function Radio({ on }: { on: boolean }) {
 }
 
 /**
+ * Who the rider is and how tall. No Save button: the form posts itself a
+ * moment after the slider settles or the name loses focus, and the list
+ * below narrows in place. Without JavaScript the same form posts on Enter.
+ */
+function RiderForm({ here, current, name, heightCm }: { here: string; current: number; name?: string; heightCm: number | null }) {
+  const fetcher = useFetcher();
+  const form = useRef<HTMLFormElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submit = (delayMs = 0) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      if (form.current) fetcher.submit(form.current);
+    }, delayMs);
+  };
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  const busy = fetcher.state !== "idle";
+  return (
+    <fetcher.Form ref={form} method="post" action={here} className="flex flex-col gap-[17px]">
+      <input type="hidden" name="intent" value="rider" />
+      <input type="hidden" name="r" value={current} />
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[19px] font-semibold tracking-[-.012em]">{name ? `How tall is ${name}?` : `Who is rider ${current + 1}, and how tall?`}</h2>
+        <span className={cx("text-[14px] text-ink-mute transition-opacity", busy && "opacity-60")}>{busy ? "Updating the list…" : "We'll pick the frame"}</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-[7px]">
+          <Lbl>Name (optional)</Lbl>
+          <input
+            name="name"
+            defaultValue={name}
+            placeholder={`Rider ${current + 1}`}
+            onBlur={(e) => {
+              if (e.target.value.trim() !== (name ?? "")) submit();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            className="rounded-field bg-white/10 px-[15px] py-[12px] text-[15.5px] shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] placeholder:text-ink-mute focus:outline-2 focus:outline-brand-bright"
+          />
+        </label>
+        <HeightField value={heightCm} onChange={submit} />
+        <noscript>
+          <button className="rounded-full bg-white/12 px-6 py-[12px] text-[15px] font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,.1)] hover:bg-white/16">Save</button>
+        </noscript>
+      </div>
+    </fetcher.Form>
+  );
+}
+
+/**
  * The height picker from the canvas: a slider for the thumb, a number box for
  * the keyboard, one value between them. The number box is what the form posts.
+ * `onChange(delayMs)` asks the form to post once the value has settled.
  */
-function HeightField({ value }: { value: number | null }) {
+function HeightField({ value, onChange }: { value: number | null; onChange: (delayMs?: number) => void }) {
   const [cm, setCm] = useState<number | "">(value ?? "");
   const shown = typeof cm === "number" ? Math.min(205, Math.max(140, cm)) : 172;
   return (
@@ -556,7 +595,10 @@ function HeightField({ value }: { value: number | null }) {
             max={205}
             step={1}
             value={shown}
-            onChange={(e) => setCm(Number(e.target.value))}
+            onChange={(e) => {
+              setCm(Number(e.target.value));
+              onChange(450);
+            }}
             aria-label="Height in centimetres"
             className="h-2 w-full cursor-pointer accent-brand"
           />
@@ -573,7 +615,11 @@ function HeightField({ value }: { value: number | null }) {
             min={80}
             max={230}
             value={cm}
-            onChange={(e) => setCm(e.target.value === "" ? "" : Number(e.target.value))}
+            onChange={(e) => {
+              setCm(e.target.value === "" ? "" : Number(e.target.value));
+              onChange(700);
+            }}
+            onBlur={() => onChange()}
             placeholder="175"
             className="num w-full bg-transparent py-[12px] text-[15.5px] placeholder:text-ink-mute focus:outline-none"
           />
