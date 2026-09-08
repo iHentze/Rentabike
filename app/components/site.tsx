@@ -29,7 +29,7 @@ export function Shell({ children, className }: { children: ReactNode; className?
 /** The white plaque keeps the logo's real brand blue on the dark ground. */
 export function Plaque({ size = 30 }: { size?: number }) {
   return (
-    <Link to="/" className="inline-flex shrink-0 items-center rounded-plaque bg-white px-[14px] py-[9px]" aria-label={SHOP.name}>
+    <Link to="/" className="inline-flex shrink-0 items-center rounded-plaque bg-white px-[9px] py-[5px]" aria-label={SHOP.name}>
       <img src="/images/logo.png" alt="" style={{ height: size }} className="block w-auto" />
     </Link>
   );
@@ -64,7 +64,7 @@ export function Header({ variant = "site", right }: { variant?: "site" | "funnel
   return (
     <header className="relative z-40 bg-header">
       <Shell className={cx("flex items-center gap-4 px-5 md:px-8", home ? "py-[14px]" : "py-3")}>
-        <Plaque size={home ? 34 : 30} />
+        <Plaque size={home ? 42 : 36} />
         {home && (
           <nav className="ml-[14px] hidden items-center gap-[26px] lg:flex">
             {NAV.map((n) => (
