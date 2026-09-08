@@ -3,7 +3,7 @@ import type { Route } from "./+types/checkout";
 import { cloudflareContext } from "~/context";
 import { Footer, Header, SHOP, Shell, Steps } from "~/components/site";
 import { Card, Lbl, Note, PillLink, cx } from "~/components/ui";
-import { BikeImage } from "~/components/bike-card";
+import { Availability, BikeImage } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { FunnelSteps } from "~/components/funnel-steps";
 import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Pin, Shield, Warning } from "~/components/icons";
@@ -283,7 +283,10 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
                           </span>
                         </div>
                         <span className="text-[17.5px] font-semibold">{a.name}</span>
-                        <span className="text-[13.5px] text-ink-mute">{[a.sizeLabel ? `Size ${a.sizeLabel}` : null, a.category === "ebike" ? "motor" : "no motor", `${a.free} free`].filter(Boolean).join(" · ")}</span>
+                        <span className="text-[13.5px] text-ink-mute">
+                          {[a.sizeLabel ? `Size ${a.sizeLabel}` : null, a.category === "ebike" ? "motor" : "no motor"].filter(Boolean).join(" · ")}
+                          <Availability free={a.free} className="ml-2" />
+                        </span>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-[9px]">
                         <span className="num font-display text-[21px] font-bold">

@@ -4,7 +4,7 @@ import type { Route } from "./+types/riders";
 import { cloudflareContext } from "~/context";
 import { Footer, Header, SHOP, Shell, TripSummary } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
-import { BikeImage, riderRange } from "~/components/bike-card";
+import { Availability, BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { FunnelSteps } from "~/components/funnel-steps";
 import { Check, Info } from "~/components/icons";
@@ -296,7 +296,8 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                             {recommended && <Tag className="self-start">Recommended</Tag>}
                             <span className={cx("text-[16px] font-semibold leading-[1.22]", gone && "text-ink-dim")}>{b.name}</span>
                             <span className={cx("text-[13px]", gone ? "text-ink-dim" : "text-ink-mute")}>
-                              {[b.sizeLabel ? `Size ${b.sizeLabel}` : null, b.category === "ebike" ? "motor" : "no motor", gone ? null : `${b.free} free`].filter(Boolean).join(" · ")}
+                              {[b.sizeLabel ? `Size ${b.sizeLabel}` : null, b.category === "ebike" ? "motor" : "no motor"].filter(Boolean).join(" · ")}
+                              {!gone && <Availability free={b.free} className="ml-2" />}
                             </span>
                             {gone ? <span className="text-[12.5px] text-danger">All out on your dates</span> : b.mine ? <span className="text-[12.5px] font-semibold text-ok">{first}'s bike</span> : riderRange(b) && <span className="text-[12.5px] text-ink-mute">{riderRange(b)}</span>}
                           </div>

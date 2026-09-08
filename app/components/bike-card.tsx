@@ -6,10 +6,11 @@ import { BikeArt, Minus, Plus } from "./icons";
 import { Price, Tag, cx } from "./ui";
 
 /** "5 available", "Only 1 left", "All out on your dates" — green, amber, red. */
+/** Green means you can have it; the count is the shop's business, not the customer's. */
 export function Availability({ free, className }: { free: number; className?: string }) {
   if (free <= 0) return <span className={cx("text-[13px] font-semibold text-danger", className)}>All out on your dates</span>;
-  if (free === 1) return <span className={cx("text-[13px] font-semibold text-warn", className)}>Only 1 left</span>;
-  return <span className={cx("text-[13px] font-semibold text-ok", className)}>{free} available</span>;
+  if (free === 1) return <span className={cx("text-[13px] font-semibold text-warn", className)}>Only one left</span>;
+  return <span className={cx("text-[13px] font-semibold text-ok", className)}>Available</span>;
 }
 
 export function riderRange(b: Pick<CatalogueBike, "sizeLabel" | "riderMinCm" | "riderMaxCm">): string {

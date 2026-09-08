@@ -106,10 +106,20 @@
      * viewport and position: sticky keeps working.
      */
     overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
   body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    /*
+     * iOS Safari sizes its panning area from the document's content, and
+     * ignores overflow-x on the root for touch panning. Clipping on body
+     * removes any too-wide content from that measurement, so there is
+     * nothing to pan to. `clip` (not hidden) keeps body out of the scroll
+     * chain, so position: sticky inside it still works.
+     */
+    overflow-x: clip;
+    max-width: 100vw;
   }
   h1, h2, h3 {
     font-family: var(--font-display);
