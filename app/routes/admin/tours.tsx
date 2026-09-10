@@ -241,7 +241,9 @@ export default function Tours({ loaderData, actionData }: Route.ComponentProps) 
               {schedules.map((s) => (
                 <tr key={s.tourId} className={cx("border-t border-white/6", !s.published && "opacity-60")}>
                   <td className="px-4 py-2 font-semibold">
-                    {s.title}
+                    <Link to={`/admin/tours/${s.tourId}`} className="hover:text-brand-bright">
+                      {s.title}
+                    </Link>
                     {!s.published && <span className="ml-2 text-[11px] font-bold uppercase text-ink-mute">unpublished</span>}
                   </td>
                   <td className="px-3 py-2 text-ink-soft">{TOUR_CATEGORY_LABEL[s.category]}</td>
@@ -255,7 +257,7 @@ export default function Tours({ loaderData, actionData }: Route.ComponentProps) 
             </tbody>
           </table>
         </div>
-        <p className="text-[13px] text-ink-mute">Departures roll forward from these slots automatically, a year ahead. Changing a slot, a price or a season is on the fleet editor, next.</p>
+        <p className="text-[13px] text-ink-mute">Departures roll forward from these slots automatically, a year ahead. Open a tour to change its slot, season, seats or price, or to publish it.</p>
       </Section>
     </div>
   );

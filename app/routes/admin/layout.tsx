@@ -27,6 +27,7 @@ const NAV = [
   { to: "/admin/tours", label: "Tours" },
   { to: "/admin/fleet", label: "Fleet" },
   { to: "/admin/stock", label: "Stock" },
+  { to: "/admin/prices", label: "Prices & places" },
   { to: "/admin/new", label: "+ New booking" },
 ];
 
