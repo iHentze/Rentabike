@@ -88,7 +88,7 @@ export function AddonCard({ addon, action, intent, hidden = {}, forLabel, max = 
       </div>
       <div className="flex items-center justify-between bg-white/4 px-[15px] py-3">
         <Price minor={addon.priceMinor} per={addon.unit === "per_bike_per_day" ? "/day" : ""} size="sm" />
-        <Form method="post" action={action} className="flex items-center gap-1">
+        <Form method="post" action={action} preventScrollReset className="flex items-center gap-1">
           {hiddenInputs}
           <input type="hidden" name="intent" value={intent} />
           <input type="hidden" name="addon" value={addon.id} />

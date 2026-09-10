@@ -43,6 +43,8 @@ const NAV = [
 
 /** The WooCommerce shop stays where it is for sales; this site does rentals and tours. */
 export const WEBSHOP_URL = "https://rentabike.fo/shop/";
+/** Route ideas, still on the old site until they are moved over. */
+export const TRIP_SUGGESTIONS_URL = "https://rentabike.fo/trip-suggestions/";
 
 export function Header({ variant = "site", right }: { variant?: "site" | "funnel"; right?: ReactNode }) {
   const home = variant === "site";
@@ -196,6 +198,17 @@ export function Footer() {
           <span className="num">
             {SHOP.phone} · {SHOP.email}
           </span>
+        </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-dim">
+          <Link to="/terms" className="hover:text-ink">
+            Rental conditions &amp; booking terms
+          </Link>
+          <Link to="/privacy" className="hover:text-ink">
+            Privacy
+          </Link>
+          <a href={TRIP_SUGGESTIONS_URL} className="hover:text-ink">
+            Trip suggestions ↗
+          </a>
         </div>
       </Shell>
     </footer>

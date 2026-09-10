@@ -12,7 +12,7 @@ import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { AddonCard } from "~/components/addon-card";
 import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { assignBike, basketHeaders, nextStep, readBasket, riderLabel, ridersOn, stepHref, unassignBike, type Basket } from "~/lib/basket";
+import { assignBike, basketHeaders, nextStep, readBasket, riderLabel, riderReady, ridersOn, stepHref, unassignBike, type Basket } from "~/lib/basket";
 import { fitsRider, getAddonsById, listBikes, ridable, type CatalogueAddon } from "~/lib/catalogue/bikes";
 import { priceBasket } from "~/lib/quote-basket";
 import { fmtDays, fmtLongDay, fmtTime } from "~/lib/format";
@@ -48,7 +48,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   const current = Number.isFinite(rParam) && rParam >= 1 && rParam <= basket.riders.length ? rParam - 1 : auto ? auto.rider : 0;
   const rider = basket.riders[current]!;
   const myBike = rider.bikeTypeId ? bikes.find((b) => b.id === rider.bikeTypeId) : undefined;
-  const step: "bike" | "extras" = url.searchParams.get("step") === "bike" || !myBike ? "bike" : "extras";
+  // Name and height come before the bike: a rider who arrived with a bike from the chooser or the
+  // catalogue but no height is still on the bike step, form first, until both are in.
+  const ready = riderReady(rider);
+  const step: "bike" | "extras" = url.searchParams.get("step") === "bike" || !myBike || !ready ? "bike" : "extras";
   const showAll = url.searchParams.get("all") === "1";
 
   // Bikes for this rider: those that fit their height (or all, on request). Free ones first,
@@ -103,6 +106,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     days,
     current,
     step,
+    ready,
     showAll,
     isLast,
     riders: basket.riders.map((r, i) => {
@@ -112,6 +116,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         name: r.name ?? "",
         heightCm: r.heightCm ?? null,
         bikeName: bike?.name ?? null,
+        bikeDone: Boolean(bike) && riderReady(r),
         bikeModel: bike?.model ?? null,
         bikeSize: bike?.sizeLabel ?? null,
         rateMinor: bike?.rateMinor ?? null,
@@ -166,7 +171,10 @@ export async function action({ context, request }: Route.ActionArgs) {
   } else if (intent === "give" && rider) {
     const bikeId = String(form.get("bike") ?? "");
     const bike = (await listBikes(env.DB, trip)).find((b) => b.id === bikeId);
-    if (bike && bike.category !== "extra" && (!tour || tour.allowedBikeTypeIds.includes(bike.id))) {
+    if (!riderReady(rider)) {
+      // The button is disabled without a name and height; this is the no-JS and stale-tab path.
+      next = { rider: r, step: "bike" };
+    } else if (bike && bike.category !== "extra" && (!tour || tour.allowedBikeTypeIds.includes(bike.id))) {
       const others = ridersOn(basket, bike.id) - (rider.bikeTypeId === bike.id ? 1 : 0);
       if (others < bike.free) {
         assignBike(rider, bike);
@@ -222,7 +230,7 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Riders({ loaderData }: Route.ComponentProps) {
-  const { tour, trip: t, days, current, step, showAll, isLast, riders, candidates, mine, forEveryone, copyFrom, after, extras, fees, bookingLines, seatLine, totalMinor, allDone } = loaderData;
+  const { tour, trip: t, days, current, step, ready, showAll, isLast, riders, candidates, mine, forEveryone, copyFrom, after, extras, fees, bookingLines, seatLine, totalMinor, allDone } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const me = riders[current]!;
   const first = me.name || `rider ${current + 1}`;
@@ -239,7 +247,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
       <FunnelSteps
         trip={trip}
         tour={tour}
-        riders={riders.map((r) => ({ label: r.label, bikeDone: Boolean(r.bikeName), extrasDone: Boolean(r.bikeName) && r.extrasDone }))}
+        riders={riders.map((r) => ({ label: r.label, bikeDone: r.bikeDone, extrasDone: r.bikeDone && r.extrasDone }))}
         position={{ at: "rider", i: current, step }}
         canCheckout={allDone}
         addRiderHref={trip.riders < MAX_RIDERS ? tripHref("/riders", trip, { riders: trip.riders + 1, r: trip.riders + 1 }) : undefined}
@@ -281,7 +289,11 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     </Link>
                   )}
                 </div>
-                {!me.heightCm && <p className="-mt-2 text-[14px] text-ink-mute">Add a height above and we'll narrow this to the frames that fit.</p>}
+                {!ready && (
+                  <p className="-mt-2 text-[14px] text-warn-soft">
+                    {!me.name && !me.heightCm ? `${first}'s name and height first` : !me.name ? "A name first" : "A height first"} — we size the frame and the counter needs to know who rides it. Then the buttons open up.
+                  </p>
+                )}
                 <div className="grid gap-[14px] md:grid-cols-2">
                   {candidates.map((b, idx) => {
                     const gone = b.free <= 0;
@@ -315,7 +327,11 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                               <input type="hidden" name="intent" value={b.mine ? "unassign" : "give"} />
                               <input type="hidden" name="r" value={current} />
                               <input type="hidden" name="bike" value={b.id} />
-                              <button className={cx("rounded-full px-[18px] py-[9px] text-[14px] font-bold", b.mine ? "bg-ok text-ok-ink hover:bg-ok/90" : "bg-white text-night hover:bg-ink-pale")}>
+                              <button
+                                disabled={!ready && !b.mine}
+                                title={!ready && !b.mine ? "Add a name and height first" : undefined}
+                                className={cx("rounded-full px-[18px] py-[9px] text-[14px] font-bold", b.mine ? "bg-ok text-ok-ink hover:bg-ok/90" : ready ? "bg-white text-night hover:bg-ink-pale" : "cursor-not-allowed bg-white/7 text-ink-dim")}
+                              >
                                 {b.mine ? "Chosen ✓" : `Give to ${first}`}
                               </button>
                             </Form>
@@ -349,7 +365,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                       {copyFrom.items.join(", ")} — {formatDKKCode(copyFrom.totalMinor)}, one tap.
                     </span>
                   </div>
-                  <Form method="post" action={here}>
+                  <Form method="post" action={here} preventScrollReset>
                     <input type="hidden" name="intent" value="copy" />
                     <input type="hidden" name="r" value={current} />
                     <input type="hidden" name="step" value="extras" />
@@ -378,7 +394,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     )}
                   </div>
                   <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
-                    <Form method="post" action={here}>
+                    <Form method="post" action={here} preventScrollReset>
                       <input type="hidden" name="intent" value="helmet" />
                       <input type="hidden" name="r" value={current} />
                       <input type="hidden" name="step" value="extras" />
@@ -390,7 +406,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                         </span>
                       </button>
                     </Form>
-                    <Form method="post" action={here}>
+                    <Form method="post" action={here} preventScrollReset>
                       <input type="hidden" name="intent" value="helmet" />
                       <input type="hidden" name="r" value={current} />
                       <input type="hidden" name="step" value="extras" />
@@ -483,12 +499,12 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                 </button>
                 {me.summary.length === 0 && <button className="text-[13.5px] font-semibold text-brand-bright hover:text-ink">{first} needs nothing else</button>}
               </Form>
-            ) : me.bikeName ? (
+            ) : me.bikeName && ready ? (
               <PillLink to={tripHref("/riders", trip, { r: current + 1, step: "extras" })} tone="primary" size="lg" block>
                 Next: {first}'s extras →
               </PillLink>
             ) : (
-              <span className="rounded-full bg-white/7 px-4 py-[15px] text-center text-[15.5px] font-bold text-ink-dim">Pick {first}'s bike to continue</span>
+              <span className="rounded-full bg-white/7 px-4 py-[15px] text-center text-[15.5px] font-bold text-ink-dim">{!ready ? `${first}'s name and height to continue` : `Pick ${first}'s bike to continue`}</span>
             )}
             {step === "bike" && <span className="text-center text-[13px] leading-[1.5] text-ink-mute">One rider at a time — a bike, then the extras that fit it, then the next rider.</span>}
           </SummaryRail>
@@ -555,15 +571,17 @@ function RiderForm({ here, current, name, heightCm }: { here: string; current: n
       <input type="hidden" name="r" value={current} />
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[19px] font-semibold tracking-[-.012em]">{name ? `How tall is ${name}?` : `Who is rider ${current + 1}, and how tall?`}</h2>
-        <span className={cx("text-[14px] text-ink-mute transition-opacity", busy && "opacity-60")}>{busy ? "Updating the list…" : "We'll pick the frame"}</span>
+        <span className={cx("text-[14px] text-ink-mute transition-opacity", busy && "opacity-60")}>{busy ? "Updating the list…" : "Both needed — we size the frame to the rider"}</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-[7px]">
-          <Lbl>Name (optional)</Lbl>
+          <Lbl>Name</Lbl>
           <input
             name="name"
             defaultValue={name}
-            placeholder={`Rider ${current + 1}`}
+            placeholder="First name is fine"
+            required
+            autoComplete="off"
             onBlur={() => submit()}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
