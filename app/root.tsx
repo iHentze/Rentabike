@@ -9,6 +9,17 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Footer, Header } from "./components/site";
+import { ResumeBar } from "./components/resume-bar";
+import { peekBasket } from "./lib/basket";
+import { readTrip } from "./lib/trip";
+
+/** Every page: is there a booking in progress to come back to? Reads the basket cookie, nothing else. */
+export async function loader({ request }: Route.LoaderArgs) {
+  const resume = await peekBasket(request);
+  const params = resume ? new URLSearchParams(resume.trip) : null;
+  const trip = params && !params.has("tour") ? readTrip(params) : null;
+  return { resume, when: trip ? { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime() } : null };
+}
 
 // Fonts are self-hosted static assets (see plan, revision 4). No third-party
 // request in the render path — the Porsche CDN outage is the lesson here.
@@ -36,8 +47,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
-  return <Outlet />;
+export default function App({ loaderData }: Route.ComponentProps) {
+  return (
+    <>
+      <Outlet />
+      {loaderData.resume && <ResumeBar resume={loaderData.resume} when={loaderData.when} />}
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

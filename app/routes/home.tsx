@@ -5,7 +5,7 @@ import { cloudflareContext } from "~/context";
 import { DateRangeCells } from "~/components/date-range";
 import { Footer, Header, SHOP, Shell } from "~/components/site";
 import { Card, Lbl, PillLink, Price, Row, Tag, cx } from "~/components/ui";
-import { Bag, Bolt, CardIcon, Chevron, ChevronDown, Child, Gravel, Mountain, Pin, Road, Shield } from "~/components/icons";
+import { Bag, Bolt, CardIcon, Chevron, ChevronDown, Child, Gravel, Mountain, Pin, Road, Shield, Star } from "~/components/icons";
 import { MAX_RIDERS, readTrip, tripDays, tripHref, type Trip } from "~/lib/trip";
 import { faroeParts, fmtDuration } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
@@ -79,6 +79,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <p className="max-w-[520px] text-[18px] leading-[1.5] text-white/90 [text-shadow:0_1px_16px_rgba(7,14,21,.6)]">
               {fleetUnits} bikes in Tórshavn — road, gravel, mountain and electric. Out the door in ten minutes, from the shop on Sverrisgøta.
             </p>
+            {/* the chooser, for anyone who doesn't know which bike: two questions, then a recommendation for their dates */}
+            <PillLink to={tripHref("/choose", trip)} tone="ghost" size="sm" className="self-start bg-ground/50 py-[9px] pl-[14px] backdrop-blur-[2px]">
+              <Star size={16} className="text-brand-bright" />
+              Not sure which bike? Two questions and we'll pick one
+            </PillLink>
           </div>
 
         </Shell>
@@ -147,7 +152,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </section>
         )}
 
-        {/* the fleet */}
+        {/* the fleet — a tile is the fast path: the type is set, the riders step opens on it */}
         <section className="flex flex-col gap-[14px]">
           <div className="flex items-baseline justify-between">
             <Lbl>The fleet · {fleetUnits} bikes</Lbl>
@@ -158,7 +163,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <Card className="p-2">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((c) => (
-                <Link key={c.category} to={tripHref("/bikes", trip, { cat: c.category })} className="flex items-center gap-[14px] rounded-field px-4 py-[15px] hover:bg-white/4">
+                <Link key={c.category} to={tripHref("/riders", trip, { cat: c.category })} className="flex items-center gap-[14px] rounded-field px-4 py-[15px] hover:bg-white/4">
                   <div className={cx("flex size-[46px] shrink-0 items-center justify-center rounded-full", c.category === "road" ? "bg-white/7 text-ink-soft" : "bg-brand/22 text-brand-bright")}>
                     {c.category === "ebike" && <Bolt size={22} />}
                     {c.category === "mountain" && <Mountain size={22} />}

@@ -168,6 +168,7 @@ export default function Bikes({ loaderData }: Route.ComponentProps) {
             </h1>
             <span className="text-[14.5px] text-ink-mute">Sorted by price · {fmtDays(days)}</span>
           </div>
+          {!tour && <p className="-mt-2 max-w-[70ch] text-[14.5px] leading-[1.5] text-ink-soft">Choose among e-bikes, mountain bikes, road bikes and gravel bikes, and browse by category on the left. Not sure which suits the riding you have in mind? Answer two questions and we'll suggest one.</p>}
           {bikes.length === 0 ? (
             <Card className="p-8 text-[15px] text-ink-soft">Nothing matches those filters. Clear a category or the height and try again.</Card>
           ) : (

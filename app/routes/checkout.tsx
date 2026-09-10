@@ -9,7 +9,7 @@ import { FunnelSteps } from "~/components/funnel-steps";
 import { CardIcon, Calendar, Check, ChevronDown, Info, Lock, Phone, Pin, Shield, Warning } from "~/components/icons";
 import { tripDays, tripHref } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { basketHeaders, clearBasketHeaders, nextStep, ownBikeOnly, readBasket, riderLabel, ridersOn, type Basket } from "~/lib/basket";
+import { basketHeaders, clearBasketHeaders, nextStep, ownBikeOnly, readBasket, riderLabel, riderReady, ridersOn, type Basket } from "~/lib/basket";
 import { fitsRider, getAddonsById, getBikesById, listBikes } from "~/lib/catalogue/bikes";
 import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { priceBasket } from "~/lib/quote-basket";
@@ -53,7 +53,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     .filter((a) => ownBike || a.unit === "per_booking" || basket.addons[a.id])
     .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
     .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, image: a.image, qty: basket.addons[a.id] ?? 0 }));
-  const helmetMissing = tour || ownBike ? [] : basket.riders.map((r, i) => ({ r, i })).filter(({ r }) => r.bikeTypeId && !(r.addons[HELMET_ID] ?? 0)).map(({ i }) => ({ r: i, label: riderLabel(basket, i) }));
+  const helmetMissing = tour || ownBike ? [] : basket.riders.map((r, i) => ({ r, i })).filter(({ r }) => r.bikeTypeId && !(r.addons[HELMET_ID] ?? 0) && !r.helmetDeclined).map(({ i }) => ({ r: i, label: riderLabel(basket, i) }));
   const unfinished = nextStep(basket);
 
   // The recovery panel: a bike went between choosing and paying.
@@ -86,6 +86,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         label: riderLabel(basket, i),
         heightCm: r.heightCm ?? null,
         bikeName: bike?.name ?? null,
+        bikeDone: Boolean(bike) && riderReady(r),
         size: bike?.sizeLabel ?? null,
         range: bike && bike.riderMinCm != null ? `rider ${bike.riderMinCm}–${bike.riderMaxCm} cm` : null,
         rateMinor: bike?.rateMinor ?? null,
@@ -104,7 +105,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     totalMinor: priced.quote?.totalMinor ?? 0,
     addons,
     ownBike,
-    ready: basket.riders.length > 0 && (tour && !tour.requiresBike ? tour.bookable && trip.riders <= tour.seatsLeft : ownBike || basket.riders.every((r) => r.bikeTypeId)) && priced.quote !== null && (!tour || (tour.bookable && trip.riders <= tour.seatsLeft)),
+    ready: basket.riders.length > 0 && (tour && !tour.requiresBike ? tour.bookable && trip.riders <= tour.seatsLeft : ownBike || basket.riders.every((r) => r.bikeTypeId && riderReady(r))) && priced.quote !== null && (!tour || (tour.bookable && trip.riders <= tour.seatsLeft)),
     lost: lost ? { id: lost.id, name: lost.name, rider: Number.isFinite(lostRider) ? lostRider : null, riderLabel: Number.isFinite(lostRider) ? riderLabel(basket, lostRider) : null, tripMinor: lost.tripMinor } : null,
     alternatives,
     error: url.searchParams.get("error"),
@@ -160,7 +161,8 @@ export async function action({ context, request }: Route.ActionArgs) {
 
   if (name.length < 2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return redirect(back({ error: "details" }), { headers });
   const needBikes = (!tour || tour.requiresBike) && !(!tour && ownBikeOnly(basket));
-  if (basket.riders.length === 0 || (needBikes && basket.riders.some((r) => !r.bikeTypeId))) return redirect(back({ error: "bikes" }), { headers });
+  // A rider with a bike but no name or height is not a booking the counter can fit: back to their step.
+  if (basket.riders.length === 0 || (needBikes && basket.riders.some((r) => !r.bikeTypeId || !riderReady(r)))) return redirect(back({ error: "bikes" }), { headers });
   if (tour && (!tour.bookable || trip.riders > tour.seatsLeft)) return redirect(back({ error: "seats" }), { headers });
 
   const attempt = async (b: Basket) => {
@@ -246,7 +248,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
       {ownBike || (tour && !tour.requiresBike) ? (
         <Steps current={3} />
       ) : (
-        <FunnelSteps trip={trip} tour={tour} riders={riders.map((r) => ({ label: r.label, bikeDone: Boolean(r.bikeName), extrasDone: Boolean(r.bikeName) && r.extrasDone }))} position={{ at: "checkout" }} canCheckout />
+        <FunnelSteps trip={trip} tour={tour} riders={riders.map((r) => ({ label: r.label, bikeDone: r.bikeDone, extrasDone: r.bikeDone && r.extrasDone }))} position={{ at: "checkout" }} canCheckout={ready} />
       )}
 
       <Shell className="grid gap-7 px-5 pb-12 pt-7 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start md:px-8">
@@ -335,7 +337,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
           {error === "seats" && <Note icon={<Warning size={17} />}>That departure can't take {trip.riders} more — pick another date on the tour page.</Note>}
           {error === "bikes" && (
             <Note icon={<Warning size={17} />}>
-              Every rider needs a bike before we can hold them.{" "}
+              Every rider needs a height and a bike before we can hold them — the shop sizes each frame to the person.{" "}
               <Link to={tripHref("/riders", trip)} className="font-semibold text-brand-bright">Back to the riders</Link>
             </Note>
           )}
@@ -542,6 +544,13 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
             <span className="inline-flex items-center gap-[9px] text-[13.5px] font-semibold text-ok"><Check size={15} /> Free cancellation until {fmtDay(deadline)} {fmtTime(deadline)}</span>
             <span className="inline-flex items-center gap-[9px] text-[13.5px] font-semibold text-ok"><Check size={15} /> Bikes held for you the moment you book</span>
             <span className="inline-flex items-start gap-[9px] pt-1 text-[12.5px] leading-[1.5] text-ink-mute"><Info size={14} className="mt-[2px] shrink-0" /> The confirmation email carries a six-letter code. Bring it, and something with your name on it.</span>
+            <span className="pt-1 text-[12.5px] leading-[1.5] text-ink-mute">
+              By booking you accept our{" "}
+              <Link to="/terms" className="font-semibold text-brand-bright hover:text-ink">
+                rental conditions and booking terms
+              </Link>
+              . Riding is at your own risk; the rent includes theft and damage cover with a DKK 1,000 excess.
+            </span>
           </div>
         </div>
       </Shell>

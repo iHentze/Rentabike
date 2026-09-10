@@ -7,13 +7,15 @@ import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
 import { Availability, BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { FunnelSteps } from "~/components/funnel-steps";
-import { Check, Info } from "~/components/icons";
+import { Check, Info, Star } from "~/components/icons";
 import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { AddonCard } from "~/components/addon-card";
 import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
-import { assignBike, basketHeaders, nextStep, readBasket, riderLabel, ridersOn, stepHref, unassignBike, type Basket } from "~/lib/basket";
-import { fitsRider, getAddonsById, listBikes, ridable, type CatalogueAddon } from "~/lib/catalogue/bikes";
+import { assignBike, basketHeaders, nextStep, readBasket, riderLabel, riderReady, ridersOn, stepHref, unassignBike, type Basket } from "~/lib/basket";
+import { CATEGORY_LABEL, CATEGORY_ORDER, fitsRider, getAddonsById, listBikes, ridable, type CatalogueAddon } from "~/lib/catalogue/bikes";
+import { adviseCategories, CATEGORY_NOUN } from "~/lib/catalogue/advice";
+import { BIKE_CATEGORIES, type BikeCategory } from "~/db/schema";
 import { priceBasket } from "~/lib/quote-basket";
 import { fmtDays, fmtLongDay, fmtTime } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
@@ -48,13 +50,25 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   const current = Number.isFinite(rParam) && rParam >= 1 && rParam <= basket.riders.length ? rParam - 1 : auto ? auto.rider : 0;
   const rider = basket.riders[current]!;
   const myBike = rider.bikeTypeId ? bikes.find((b) => b.id === rider.bikeTypeId) : undefined;
-  const step: "bike" | "extras" = url.searchParams.get("step") === "bike" || !myBike ? "bike" : "extras";
+  // Height comes before the bike: a rider who arrived with a bike from the chooser or the
+  // catalogue but no height is still on the bike step, form first, until it is in.
+  const ready = riderReady(rider);
+  // The helmet is a yes-or-no by name; the extras step is not done until it has one.
+  const helmetOffered = Boolean(myBike?.addonIds.includes(HELMET)) && !tour;
+  const helmetAnswered = (rider.addons[HELMET] ?? 0) > 0 || rider.helmetDeclined === true;
+  const step: "bike" | "extras" = url.searchParams.get("step") === "bike" || !myBike || !ready ? "bike" : "extras";
   const showAll = url.searchParams.get("all") === "1";
+
+  // The type the list opens on: `cat` in the URL (a chip, a home-page tile, the chooser), else what the
+  // basket remembers — the chooser's advice or the previous rider's bike. "all" is every type.
+  const catParam = url.searchParams.get("cat");
+  const isCat = (v: string | null): v is BikeCategory => v !== null && (BIKE_CATEGORIES as readonly string[]).includes(v) && v !== "extra";
+  const category: BikeCategory | null = catParam === "all" ? null : isCat(catParam) ? catParam : (basket.preferredCategory ?? null);
 
   // Bikes for this rider: those that fit their height (or all, on request). Free ones first,
   // then frames whose stated range covers the rider, then frames that state no range at all.
   const hasRange = (b: { riderMinCm: number | null; riderMaxCm: number | null }) => b.riderMinCm != null && b.riderMaxCm != null;
-  const candidates = fleet
+  const fitting = fleet
     .filter((b) => showAll || fitsRider(b, rider.heightCm))
     .map((b) => ({ ...b, freeForRider: b.free - ridersOn(basket, b.id) + (rider.bikeTypeId === b.id ? 1 : 0), ranged: hasRange(b) && fitsRider(b, rider.heightCm) }))
     .sort(
@@ -64,6 +78,12 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         a.rateMinor - b.rateMinor ||
         a.name.localeCompare(b.name),
     );
+  // One chip per type, counted for this rider's height and dates. The rider's own bike always shows.
+  const chips = CATEGORY_ORDER.filter((c) => c !== "extra").map((c) => ({ category: c, label: CATEGORY_LABEL[c], free: fitting.filter((b) => b.category === c && b.freeForRider > 0).length }));
+  const candidates = category ? fitting.filter((b) => b.category === category || b.id === rider.bikeTypeId) : fitting;
+  // What the chooser said, if it said anything and it still holds for this type.
+  const advised = basket.advice ? adviseCategories(fleet, basket.advice.terrain, basket.advice.effort)[0] : undefined;
+  const advice = advised && advised.category === category ? { noun: CATEGORY_NOUN[advised.category], reason: advised.reasons[0] ?? "" } : null;
 
   // This rider's extras: what their bike takes, helmet first, nothing that belongs to the whole booking.
   const chosen = basket.riders.map((r) => (r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined)).filter((b) => b !== undefined);
@@ -103,7 +123,13 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     days,
     current,
     step,
+    ready,
+    helmetOffered,
+    helmetAnswered,
     showAll,
+    category,
+    chips,
+    advice,
     isLast,
     riders: basket.riders.map((r, i) => {
       const bike = r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined;
@@ -112,6 +138,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         name: r.name ?? "",
         heightCm: r.heightCm ?? null,
         bikeName: bike?.name ?? null,
+        bikeDone: Boolean(bike) && riderReady(r),
         bikeModel: bike?.model ?? null,
         bikeSize: bike?.sizeLabel ?? null,
         rateMinor: bike?.rateMinor ?? null,
@@ -121,6 +148,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         extras: priced.riderExtras[i]!.map((l) => ({ label: `${shortName(l.label)}${l.qty > 1 ? ` ×${l.qty}` : ""}`, totalMinor: l.totalMinor, included: Boolean(tour) && l.addonId === HELMET })),
         summary: summary(r),
         hasHelmet: (r.addons[HELMET] ?? 0) > 0,
+        helmetDeclined: r.helmetDeclined === true,
       };
     }),
     candidates: candidates.map((b) => ({ id: b.id, slug: b.slug, name: b.name, category: b.category, image: b.image, sizeLabel: b.sizeLabel, riderMinCm: b.riderMinCm, riderMaxCm: b.riderMaxCm, free: b.freeForRider, rateMinor: b.rateMinor, perDay: b.perDay, mine: rider.bikeTypeId === b.id, ranged: b.ranged })),
@@ -166,10 +194,14 @@ export async function action({ context, request }: Route.ActionArgs) {
   } else if (intent === "give" && rider) {
     const bikeId = String(form.get("bike") ?? "");
     const bike = (await listBikes(env.DB, trip)).find((b) => b.id === bikeId);
-    if (bike && bike.category !== "extra" && (!tour || tour.allowedBikeTypeIds.includes(bike.id))) {
+    if (!riderReady(rider)) {
+      // The button is disabled without a name and height; this is the no-JS and stale-tab path.
+      next = { rider: r, step: "bike" };
+    } else if (bike && bike.category !== "extra" && (!tour || tour.allowedBikeTypeIds.includes(bike.id))) {
       const others = ridersOn(basket, bike.id) - (rider.bikeTypeId === bike.id ? 1 : 0);
       if (others < bike.free) {
         assignBike(rider, bike);
+        basket.preferredCategory = bike.category;
         next = { rider: r, step: "extras" };
       }
     }
@@ -186,6 +218,8 @@ export async function action({ context, request }: Route.ActionArgs) {
       const n = (rider.addons[id] ?? 0) + (Number.isFinite(delta) ? delta : 0);
       if (n <= 0) delete rider.addons[id];
       else rider.addons[id] = Math.min(id === HELMET ? 1 : MAX_PER_RIDER, n);
+      // "No" must leave a mark, or the question looks unanswered and the radio stays empty.
+      if (intent === "helmet") rider.helmetDeclined = form.get("value") !== "yes";
     }
     next = { rider: r, step: "extras" };
   } else if (intent === "copy" && rider?.bikeTypeId) {
@@ -194,8 +228,15 @@ export async function action({ context, request }: Route.ActionArgs) {
     if (from && bike) for (const [id, qty] of Object.entries(from.addons)) if (bike.addonIds.includes(id)) rider.addons[id] = qty;
     next = { rider: r, step: "extras" };
   } else if (intent === "done" && rider) {
-    rider.extrasDone = true;
-    next = nextStep(basket) ?? "checkout";
+    const bike = rider.bikeTypeId ? (await listBikes(env.DB, trip)).find((b) => b.id === rider.bikeTypeId) : undefined;
+    const helmetOpen = Boolean(bike?.addonIds.includes(HELMET)) && !tour && !(rider.addons[HELMET] ?? 0) && !rider.helmetDeclined;
+    if (helmetOpen) {
+      // The button is disabled until the helmet has a yes or a no; this is the no-JS and stale-tab path.
+      next = { rider: r, step: "extras" };
+    } else {
+      rider.extrasDone = true;
+      next = nextStep(basket) ?? "checkout";
+    }
   } else if (intent === "addon") {
     // Something for the whole booking: a car carrier, bag storage.
     const id = String(form.get("addon") ?? "");
@@ -222,11 +263,12 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Riders({ loaderData }: Route.ComponentProps) {
-  const { tour, trip: t, days, current, step, showAll, isLast, riders, candidates, mine, forEveryone, copyFrom, after, extras, fees, bookingLines, seatLine, totalMinor, allDone } = loaderData;
+  const { tour, trip: t, days, current, step, ready, helmetOffered, helmetAnswered, showAll, category, chips, advice, isLast, riders, candidates, mine, forEveryone, copyFrom, after, extras, fees, bookingLines, seatLine, totalMinor, allDone } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const me = riders[current]!;
   const first = me.name || `rider ${current + 1}`;
-  const here = tripHref("/riders", trip, { r: current + 1, step, all: showAll ? 1 : undefined });
+  const cat = category ?? "all";
+  const here = tripHref("/riders", trip, { r: current + 1, step, all: showAll ? 1 : undefined, cat });
   const fits = candidates.filter((c) => c.free > 0);
   const helmet = mine.find((a) => a.id === HELMET);
   const rest = mine.filter((a) => a.id !== HELMET);
@@ -239,7 +281,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
       <FunnelSteps
         trip={trip}
         tour={tour}
-        riders={riders.map((r) => ({ label: r.label, bikeDone: Boolean(r.bikeName), extrasDone: Boolean(r.bikeName) && r.extrasDone }))}
+        riders={riders.map((r) => ({ label: r.label, bikeDone: r.bikeDone, extrasDone: r.bikeDone && r.extrasDone }))}
         position={{ at: "rider", i: current, step }}
         canCheckout={allDone}
         addRiderHref={trip.riders < MAX_RIDERS ? tripHref("/riders", trip, { riders: trip.riders + 1, r: trip.riders + 1 }) : undefined}
@@ -272,17 +314,59 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
               <div className="flex flex-col gap-[14px]">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h2 className="text-[19px] font-semibold tracking-[-.012em]">
-                    {me.heightCm && !showAll ? `Free for ${me.heightCm} cm on your dates` : "Free on your dates"}
-                    <span className="ml-2 text-[14px] font-normal text-ink-mute">{fits.length} bikes</span>
+                    {category ? `${CATEGORY_LABEL[category]}${category === "ebike" ? "" : " bikes"} free` : "Free"}
+                    {me.heightCm && !showAll ? ` for ${me.heightCm} cm on your dates` : " on your dates"}
+                    <span className="ml-2 text-[14px] font-normal text-ink-mute">{fits.length} {fits.length === 1 ? "bike" : "bikes"}</span>
                   </h2>
                   {me.heightCm && (
-                    <Link to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? undefined : 1 })} className="text-[14px] font-semibold text-brand-bright hover:text-ink">
+                    <Link to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? undefined : 1, cat })} className="text-[14px] font-semibold text-brand-bright hover:text-ink">
                       {showAll ? "Only my size" : "Show other sizes"}
                     </Link>
                   )}
                 </div>
-                {!me.heightCm && <p className="-mt-2 text-[14px] text-ink-mute">Add a height above and we'll narrow this to the frames that fit.</p>}
-                <div className="grid gap-[14px] md:grid-cols-2">
+                {/* the type: one tap, and it sticks for the next rider */}
+                {ready && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {chips.map((c) => {
+                      const on = category === c.category;
+                      return (
+                        <Link
+                          key={c.category}
+                          to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? 1 : undefined, cat: on ? "all" : c.category })}
+                          preventScrollReset
+                          aria-pressed={on}
+                          className={cx("inline-flex items-center gap-2 rounded-full px-4 py-[9px] text-[14px] font-semibold transition-colors", on ? "bg-brand text-ink" : c.free > 0 ? "bg-white/8 text-ink hover:bg-white/14" : "bg-white/4 text-ink-dim")}
+                        >
+                          {c.label}
+                          <span className={cx("num text-[12.5px]", on ? "text-ink/80" : "text-ink-mute")}>{c.free}</span>
+                        </Link>
+                      );
+                    })}
+                    {category && (
+                      <Link to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? 1 : undefined, cat: "all" })} preventScrollReset className="px-2 text-[13.5px] font-semibold text-brand-bright hover:text-ink">
+                        All types
+                      </Link>
+                    )}
+                  </div>
+                )}
+                {ready && advice && (
+                  <span className="flex gap-[10px] text-[14px] leading-[1.5] text-ink-soft">
+                    <Star size={16} className="mt-[3px] shrink-0 text-brand-bright" />
+                    <span>
+                      We'd put {first} on {advice.noun}: {advice.reason.charAt(0).toLowerCase() + advice.reason.slice(1)}.
+                    </span>
+                  </span>
+                )}
+                {!ready && (
+                  <Card className="flex flex-col gap-2 bg-brand/12 px-5 py-[18px]">
+                    <span className="text-[15.5px] font-semibold">How tall is {first}? Then the bikes appear.</span>
+                    <span className="text-[14px] leading-[1.5] text-ink-soft">
+                      Slide or type the height above and we show the {fits.length} free bikes in frames that fit.
+                      {me.bikeName && ` ${first} has the ${me.bikeName} from before — we check it fits as soon as the height is in.`}
+                    </span>
+                  </Card>
+                )}
+                {ready && <div className="grid gap-[14px] md:grid-cols-2">
                   {candidates.map((b, idx) => {
                     const gone = b.free <= 0;
                     const recommended = !gone && idx === 0 && b.ranged && !showAll;
@@ -315,7 +399,11 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                               <input type="hidden" name="intent" value={b.mine ? "unassign" : "give"} />
                               <input type="hidden" name="r" value={current} />
                               <input type="hidden" name="bike" value={b.id} />
-                              <button className={cx("rounded-full px-[18px] py-[9px] text-[14px] font-bold", b.mine ? "bg-ok text-ok-ink hover:bg-ok/90" : "bg-white text-night hover:bg-ink-pale")}>
+                              <button
+                                disabled={!ready && !b.mine}
+                                title={!ready && !b.mine ? "Add a height first" : undefined}
+                                className={cx("rounded-full px-[18px] py-[9px] text-[14px] font-bold", b.mine ? "bg-ok text-ok-ink hover:bg-ok/90" : ready ? "bg-white text-night hover:bg-ink-pale" : "cursor-not-allowed bg-white/7 text-ink-dim")}
+                              >
                                 {b.mine ? "Chosen ✓" : `Give to ${first}`}
                               </button>
                             </Form>
@@ -324,8 +412,12 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                       </div>
                     );
                   })}
-                </div>
-                {candidates.length === 0 && <Card className="p-6 text-[15px] text-ink-soft">Nothing in the fleet fits {me.heightCm} cm on these dates. Try "Show other sizes" — we can often adjust a frame.</Card>}
+                </div>}
+                {ready && candidates.length === 0 && (
+                  <Card className="p-6 text-[15px] text-ink-soft">
+                    {category ? `No ${CATEGORY_LABEL[category].toLowerCase()} fits ${me.heightCm} cm on these dates — tap another type above, or "Show other sizes"; we can often adjust a frame.` : `Nothing in the fleet fits ${me.heightCm} cm on these dates. Try "Show other sizes" — we can often adjust a frame.`}
+                  </Card>
+                )}
               </div>
             </>
           ) : (
@@ -349,7 +441,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                       {copyFrom.items.join(", ")} — {formatDKKCode(copyFrom.totalMinor)}, one tap.
                     </span>
                   </div>
-                  <Form method="post" action={here}>
+                  <Form method="post" action={here} preventScrollReset>
                     <input type="hidden" name="intent" value="copy" />
                     <input type="hidden" name="r" value={current} />
                     <input type="hidden" name="step" value="extras" />
@@ -361,7 +453,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
 
               {/* the helmet, by name, before anything else */}
               {helmet && !tour && (
-                <Card className={cx("flex flex-col gap-4 p-[22px]", helmet.qty > 0 ? "shadow-[inset_0_0_0_1.5px_rgba(46,212,122,.55)]" : "bg-[linear-gradient(rgba(255,176,32,.07),rgba(255,176,32,.07))] shadow-[inset_0_0_0_1.5px_rgba(255,176,32,.55)]")}>
+                <Card className={cx("flex flex-col gap-4 p-[22px]", helmet.qty > 0 ? "shadow-[inset_0_0_0_1.5px_rgba(46,212,122,.55)]" : me.helmetDeclined ? "shadow-[inset_0_0_0_1.5px_rgba(255,255,255,.14)]" : "bg-[linear-gradient(rgba(255,176,32,.07),rgba(255,176,32,.07))] shadow-[inset_0_0_0_1.5px_rgba(255,176,32,.55)]")}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="flex items-center gap-4">
                       {helmet.image && (
@@ -373,12 +465,14 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     </span>
                     {helmet.qty > 0 ? (
                       <span className="rounded-full bg-ok/16 px-3 py-[5px] text-[12px] font-bold tracking-[.04em] text-ok">HELMET ADDED</span>
+                    ) : me.helmetDeclined ? (
+                      <span className="rounded-full bg-white/10 px-3 py-[5px] text-[12px] font-bold tracking-[.04em] text-ink-soft">BRINGING THEIR OWN</span>
                     ) : (
                       <span className="rounded-full bg-warn/16 px-3 py-[5px] text-[12px] font-bold tracking-[.04em] text-warn">NOT INCLUDED WITH RENTALS</span>
                     )}
                   </div>
                   <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
-                    <Form method="post" action={here}>
+                    <Form method="post" action={here} preventScrollReset>
                       <input type="hidden" name="intent" value="helmet" />
                       <input type="hidden" name="r" value={current} />
                       <input type="hidden" name="step" value="extras" />
@@ -390,14 +484,14 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                         </span>
                       </button>
                     </Form>
-                    <Form method="post" action={here}>
+                    <Form method="post" action={here} preventScrollReset>
                       <input type="hidden" name="intent" value="helmet" />
                       <input type="hidden" name="r" value={current} />
                       <input type="hidden" name="step" value="extras" />
-                      <button name="value" value="no" className={cx("flex w-full items-center gap-[13px] rounded-[16px] px-[17px] py-[15px] text-left", helmet.qty === 0 && me.extrasDone ? "bg-white/8 shadow-[inset_0_0_0_2px_rgba(255,255,255,.25)]" : "bg-white/5 hover:bg-white/8")}>
-                        <Radio on={false} />
+                      <button name="value" value="no" className={cx("flex w-full items-center gap-[13px] rounded-[16px] px-[17px] py-[15px] text-left", helmet.qty === 0 && me.helmetDeclined ? "bg-white/8 shadow-[inset_0_0_0_2px_rgba(255,255,255,.35)]" : "bg-white/5 hover:bg-white/8")}>
+                        <Radio on={helmet.qty === 0 && me.helmetDeclined} />
                         <span className="flex flex-col gap-[2px]">
-                          <span className="text-[15.5px] font-semibold">No — {first} brings {me.name ? "their" : "your"} own</span>
+                          <span className="text-[15.5px] font-semibold">No — {first} brings their own</span>
                           <span className="text-[13px] text-ink-mute">Fine. Bring it to the shop, we check the fit.</span>
                         </span>
                       </button>
@@ -478,17 +572,21 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                 <input type="hidden" name="intent" value="done" />
                 <input type="hidden" name="r" value={current} />
                 <input type="hidden" name="step" value="extras" />
-                <button className="w-full rounded-full bg-white px-4 py-[15px] text-[15.5px] font-bold text-night hover:bg-ink-pale">
-                  {after ? `Done — now ${after.label}'s ${after.step === "bike" ? "bike" : "extras"} →` : "Continue to checkout"}
-                </button>
-                {me.summary.length === 0 && <button className="text-[13.5px] font-semibold text-brand-bright hover:text-ink">{first} needs nothing else</button>}
+                {helmetOffered && !helmetAnswered ? (
+                  <span className="rounded-full bg-white/7 px-4 py-[15px] text-center text-[15.5px] font-bold text-ink-dim">Helmet: yes or no, then continue</span>
+                ) : (
+                  <button className="w-full rounded-full bg-white px-4 py-[15px] text-[15.5px] font-bold text-night hover:bg-ink-pale">
+                    {after ? `Done — now ${after.label}'s ${after.step === "bike" ? "bike" : "extras"} →` : "Continue to checkout"}
+                  </button>
+                )}
+                {me.summary.length === 0 && (!helmetOffered || helmetAnswered) && <button className="text-[13.5px] font-semibold text-brand-bright hover:text-ink">{first} needs nothing else</button>}
               </Form>
-            ) : me.bikeName ? (
+            ) : me.bikeName && ready ? (
               <PillLink to={tripHref("/riders", trip, { r: current + 1, step: "extras" })} tone="primary" size="lg" block>
                 Next: {first}'s extras →
               </PillLink>
             ) : (
-              <span className="rounded-full bg-white/7 px-4 py-[15px] text-center text-[15.5px] font-bold text-ink-dim">Pick {first}'s bike to continue</span>
+              <span className="rounded-full bg-white/7 px-4 py-[15px] text-center text-[15.5px] font-bold text-ink-dim">{!ready ? `${first}'s height to continue` : `Pick ${first}'s bike to continue`}</span>
             )}
             {step === "bike" && <span className="text-center text-[13px] leading-[1.5] text-ink-mute">One rider at a time — a bike, then the extras that fit it, then the next rider.</span>}
           </SummaryRail>
@@ -555,7 +653,7 @@ function RiderForm({ here, current, name, heightCm }: { here: string; current: n
       <input type="hidden" name="r" value={current} />
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[19px] font-semibold tracking-[-.012em]">{name ? `How tall is ${name}?` : `Who is rider ${current + 1}, and how tall?`}</h2>
-        <span className={cx("text-[14px] text-ink-mute transition-opacity", busy && "opacity-60")}>{busy ? "Updating the list…" : "We'll pick the frame"}</span>
+        <span className={cx("text-[14px] text-ink-mute transition-opacity", busy && "opacity-60")}>{busy ? "Updating the list…" : "The height picks the frame"}</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-[7px]">
@@ -564,6 +662,7 @@ function RiderForm({ here, current, name, heightCm }: { here: string; current: n
             name="name"
             defaultValue={name}
             placeholder={`Rider ${current + 1}`}
+            autoComplete="off"
             onBlur={() => submit()}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -605,6 +704,13 @@ function HeightField({ value, onChange }: { value: number | null; onChange: (del
             onChange={(e) => {
               setCm(Number(e.target.value));
               onChange(450);
+            }}
+            // A tap on the thumb without a drag fires no change; take the value it is resting on.
+            onPointerUp={(e) => {
+              if (typeof cm !== "number") {
+                setCm(Number(e.currentTarget.value));
+                onChange(0);
+              }
             }}
             aria-label="Height in centimetres"
             className="h-2 w-full cursor-pointer accent-brand"

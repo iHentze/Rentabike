@@ -61,7 +61,7 @@ export function AddonsPanel({ addons, action, riders, heading, helmetsIncluded, 
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {helmet.qty < riders && (
-              <Form method="post" action={action}>
+              <Form method="post" action={action} preventScrollReset>
                 {hiddenInputs}
                 <input type="hidden" name="intent" value="addon" />
                 <input type="hidden" name="addon" value={helmet.id} />
@@ -88,7 +88,7 @@ export function AddonsPanel({ addons, action, riders, heading, helmetsIncluded, 
 
 function Stepper({ addon, action, hidden }: { addon: PanelAddon; action: string; hidden: Record<string, string | number> }) {
   return (
-    <Form method="post" action={action} className="flex shrink-0 items-center gap-1">
+    <Form method="post" action={action} preventScrollReset className="flex shrink-0 items-center gap-1">
       {Object.entries(hidden).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}

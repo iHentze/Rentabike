@@ -66,6 +66,26 @@ export default function Tours({ loaderData }: Route.ComponentProps) {
       </section>
 
       <Shell className="flex flex-col gap-[34px] px-5 pb-11 pt-7 md:px-8">
+        {/* the shop's own words for someone who has just landed and finds the islands a bit much */}
+        <Card className="grid gap-5 px-[22px] py-[22px] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8 md:px-7">
+          <div className="flex flex-col gap-2">
+            <Lbl>New to the islands?</Lbl>
+            <h2 className="font-display text-[24px] font-bold leading-[1.15] tracking-[-.018em]">Explore the Faroe Islands with a local guide</h2>
+            <p className="text-[15px] leading-[1.55] text-ink-soft">The Faroe Islands may look challenging when you first arrive, but with the right route and a local guide they are a safe, enjoyable and unforgettable place to explore. Find the experience that suits you best.</p>
+          </div>
+          <div className="flex flex-col gap-4 text-[14.5px] leading-[1.55] text-ink-pale">
+            <p>
+              New to biking here? The{" "}
+              <TourLink slug="city-sightseeing-ebike">sightseeing e-bike tour</TourLink> is a comfortable and reassuring first choice, and{" "}
+              <TourLink slug="historical-kirkjubour">Historical Kirkjubøur</TourLink> is a beautiful ride on paved roads with local history along the way. On any guided ride you can take an e-bike to make the hills and the wind easier, or a gravel, road or mountain bike if you want a more active ride.
+            </p>
+            <p>
+              On foot, the <TourLink slug="clifftop-bliss-sandoy">Clifftop on Sandoy</TourLink> and the{" "}
+              <TourLink slug="pilgrims-path-medieval-heart">walk to Kirkjubøur</TourLink> reach great viewpoints without a long or demanding hike. For more distance, height or adventure, choose one of the longer hikes or the trail run.
+            </p>
+          </div>
+        </Card>
+
         <Card className="flex flex-col gap-3 px-[22px] py-[17px] md:flex-row md:items-center md:gap-[26px]">
           <Lbl className="shrink-0">Every guided ride includes</Lbl>
           <div className="flex flex-wrap items-center gap-x-[22px] gap-y-2">
@@ -162,5 +182,14 @@ export default function Tours({ loaderData }: Route.ComponentProps) {
 
       <Footer />
     </>
+  );
+}
+
+/** A tour named in the intro, as a link to its page. */
+function TourLink({ slug, children }: { slug: string; children: React.ReactNode }) {
+  return (
+    <Link to={`/tours/${slug}`} className="font-semibold text-brand-bright hover:text-ink">
+      {children}
+    </Link>
   );
 }

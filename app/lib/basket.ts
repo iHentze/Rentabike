@@ -5,7 +5,9 @@
  * Prices are never stored here: ids and quantities only. The server prices.
  */
 import { createCookie } from "react-router";
-import { tripHref, type Trip } from "./trip";
+import { readTrip, tripHref, tripParams, type Trip } from "./trip";
+import { BIKE_CATEGORIES, type BikeCategory } from "~/db/schema";
+import { isEffort, isTerrain, type Effort, type Terrain } from "./catalogue/advice";
 
 export interface BasketRider {
   name?: string;
@@ -15,6 +17,8 @@ export interface BasketRider {
   addons: Record<string, number>;
   /** The rider has been through their extras step, even if they chose nothing. */
   extrasDone?: boolean;
+  /** Asked about a helmet by name and said no. Without this a "no" leaves no trace and the question looks unanswered. */
+  helmetDeclined?: boolean;
 }
 
 export interface Basket {
@@ -27,6 +31,20 @@ export interface Basket {
   dropoffLocationId?: string;
   /** "If a bike goes while I'm booking, put me on the closest one at the same price or less." */
   autoSwap?: boolean;
+  /**
+   * The trip this basket was last touched with, as query params. The trip
+   * lives in the URL; this copy is what lets a customer who wandered off to
+   * the home page or a tour pick the booking up again from where they were.
+   */
+  trip?: string;
+  /**
+   * The type of bike the riders step opens on: what the chooser advised, what
+   * the home page tile said, or what the previous rider took. A preference,
+   * never a restriction — every rider can switch with one tap.
+   */
+  preferredCategory?: BikeCategory;
+  /** The chooser's answers, so the riders step can say why it suggests the type it does. */
+  advice?: { terrain: Terrain; effort: Effort };
 }
 
 const cookie = createCookie("rb_basket", {
@@ -48,12 +66,60 @@ export async function readBasket(request: Request, trip: Trip): Promise<Basket> 
     pickupLocationId: typeof raw?.pickupLocationId === "string" ? raw.pickupLocationId : undefined,
     dropoffLocationId: typeof raw?.dropoffLocationId === "string" ? raw.dropoffLocationId : undefined,
     autoSwap: raw?.autoSwap === true,
+    trip: tripParams(trip).toString(),
+    preferredCategory: cleanCategory(raw?.preferredCategory),
+    advice: cleanAdvice(raw?.advice),
   };
   while (basket.riders.length < trip.riders) basket.riders.push({ addons: {} });
   basket.riders.length = trip.riders;
   if (!basket.pickupLocationId && trip.pickupLocationId) basket.pickupLocationId = trip.pickupLocationId;
   if (!basket.dropoffLocationId && trip.dropoffLocationId) basket.dropoffLocationId = trip.dropoffLocationId;
   return basket;
+}
+
+/** What the resume bar needs to know about an unfinished booking, from any page, without a trip in the URL. */
+export interface BasketPeek {
+  /** The trip as query params — append to /riders or /checkout. */
+  trip: string;
+  riders: number;
+  /** Riders with a bike picked. */
+  withBike: number;
+  /** Riders with a bike and a height — the ones the counter can fit. */
+  ridersReady: number;
+  /** Own-bike bookings: helmets and bags only, no rider steps. */
+  ownBike: boolean;
+  /** Where "Continue" goes. */
+  href: string;
+}
+
+/**
+ * Read the basket cookie for what it says about an unfinished booking, or
+ * null if there is nothing to resume. Used by the root loader on every page.
+ */
+export async function peekBasket(request: Request, now: number = Date.now()): Promise<BasketPeek | null> {
+  const raw = (await cookie.parse(request.headers.get("Cookie"))) as Partial<Basket> | null;
+  if (!raw || typeof raw.trip !== "string" || !raw.trip) return null;
+  const params = new URLSearchParams(raw.trip);
+  const trip = params.has("tour") ? null : readTrip(params, now);
+  // A tour basket carries a departure id; the riders page resolves it. A rental in the past is not worth resuming.
+  if (trip && trip.startAt.getTime() < now) return null;
+  const riders = Array.isArray(raw.riders) ? raw.riders.map(cleanRider) : [];
+  const extras = cleanCounts(raw.extras);
+  const addons = cleanCounts(raw.addons);
+  const started = riders.some((r) => r.bikeTypeId || r.heightCm || r.name) || Object.keys(extras).length > 0 || Object.keys(addons).length > 0;
+  if (!started) return null;
+  const basket: Basket = { riders, extras, addons };
+  const ownBike = ownBikeOnly(basket);
+  const next = nextStep(basket);
+  const href = ownBike || !next ? `/checkout?${params}` : `/riders?${params}&r=${next.rider + 1}&step=${next.step}`;
+  return {
+    trip: params.toString(),
+    riders: riders.length,
+    withBike: riders.filter((r) => r.bikeTypeId).length,
+    ridersReady: riders.filter((r) => riderReady(r) && r.bikeTypeId).length,
+    ownBike,
+    href,
+  };
 }
 
 export async function basketHeaders(basket: Basket): Promise<HeadersInit> {
@@ -73,7 +139,20 @@ function cleanRider(r: unknown): BasketRider {
     bikeTypeId: typeof o.bikeTypeId === "string" ? o.bikeTypeId : undefined,
     addons: cleanCounts(o.addons),
     extrasDone: o.extrasDone === true,
+    helmetDeclined: o.helmetDeclined === true,
   };
+}
+
+function cleanCategory(v: unknown): BikeCategory | undefined {
+  return typeof v === "string" && (BIKE_CATEGORIES as readonly string[]).includes(v) && v !== "extra" ? (v as BikeCategory) : undefined;
+}
+
+function cleanAdvice(v: unknown): { terrain: Terrain; effort: Effort } | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
+  const o = v as Record<string, unknown>;
+  const terrain = typeof o.terrain === "string" ? o.terrain : null;
+  const effort = typeof o.effort === "string" ? o.effort : null;
+  return isTerrain(terrain) && isEffort(effort) ? { terrain, effort } : undefined;
 }
 
 function cleanCounts(v: unknown): Record<string, number> {
@@ -93,6 +172,15 @@ export function ownBikeOnly(basket: Basket): boolean {
 /** How many riders are on a given bike type. */
 export function ridersOn(basket: Basket, bikeTypeId: string): number {
   return basket.riders.filter((r) => r.bikeTypeId === bikeTypeId).length;
+}
+
+/**
+ * A rider we can hand a bike to: one with a height, because the frame is
+ * sized to the rider. A name is welcome but not needed — "Rider 2" is a
+ * perfectly good label at the counter.
+ */
+export function riderReady(r: BasketRider): boolean {
+  return typeof r.heightCm === "number";
 }
 
 /** The first rider still without a bike, or -1. */
@@ -120,7 +208,7 @@ export interface FunnelStep {
  * having been asked about a helmet by name.
  */
 export function nextStep(basket: Basket): FunnelStep | null {
-  const noBike = basket.riders.findIndex((r) => !r.bikeTypeId);
+  const noBike = basket.riders.findIndex((r) => !r.bikeTypeId || !riderReady(r));
   if (noBike >= 0) return { rider: noBike, step: "bike" };
   const noExtras = basket.riders.findIndex((r) => r.bikeTypeId && !r.extrasDone);
   if (noExtras >= 0) return { rider: noExtras, step: "extras" };

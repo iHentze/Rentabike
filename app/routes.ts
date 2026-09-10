@@ -11,6 +11,11 @@ export default [
   route("tours", "routes/tours.tsx"),
   route("tours/:slug", "routes/tours.$slug.tsx"),
   route("booking", "routes/booking.tsx"),
+  // "Start over" on the resume bar.
+  route("basket/clear", "routes/basket.clear.ts"),
+  // The small print, linked from the footer and the checkout.
+  route("terms", "routes/terms.tsx"),
+  route("privacy", "routes/privacy.tsx"),
   route("booked/:code", "routes/booked.$code.tsx"),
   route("booked/:code/calendar.ics", "routes/booked.$code.calendar[.]ics.ts"),
   // Card payment for a held booking, and ePay's notification about it.
