@@ -6,6 +6,12 @@ name: Map data
 
 on:
   workflow_dispatch:
+  # Until the workflow is on main it cannot be dispatched, so a push whose
+  # commit message says [map-data] runs it too.
+  push:
+    branches:
+      - main
+      - "claude/**"
 
 permissions:
   contents: write
@@ -13,6 +19,7 @@ permissions:
 jobs:
   build:
     name: Fetch OSM and rebuild public/map
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[map-data]')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
