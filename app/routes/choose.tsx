@@ -3,7 +3,8 @@ import type { Route } from "./+types/choose";
 import { cloudflareContext } from "~/context";
 import { Footer, Header, Shell, TripSummary } from "~/components/site";
 import { Card, Lbl, Price, cx } from "~/components/ui";
-import { Bolt, Check, Gravel, Mountain, Road, Star, Wind } from "~/components/icons";
+import { Check, Star, Wind } from "~/components/icons";
+import { BikeImage } from "~/components/bike-card";
 import { readTrip, tripDays, tripHref } from "~/lib/trip";
 import { basketHeaders, readBasket } from "~/lib/basket";
 import { CATEGORY_LABEL, listBikes, ridable } from "~/lib/catalogue/bikes";
@@ -57,15 +58,12 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect(tripHref("/riders", trip, { cat: category }), { headers: await basketHeaders(basket) });
 }
 
-const ICON: Record<BikeCategory, typeof Bolt> = { ebike: Bolt, mountain: Mountain, gravel: Gravel, road: Road, extra: Bolt };
-
 export default function Choose({ loaderData }: Route.ComponentProps) {
   const { trip: t, days, terrain, effort, fleetFree, best, alternatives } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, pickupLocationId: t.pickupLocationId, dropoffLocationId: t.dropoffLocationId };
   const href = (extra: Record<string, string | undefined>) => tripHref("/choose", trip, { t: terrain ?? undefined, e: effort ?? undefined, ...extra });
   const here = tripHref("/choose", trip, { t: terrain ?? undefined, e: effort ?? undefined });
   const answered = Boolean(terrain && effort);
-  const Icon = best ? ICON[best.category] : Star;
 
   return (
     <>
@@ -114,14 +112,16 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
           <div className="flex flex-col gap-4 p-[18px]">
             {best ? (
               <>
-                <div className="flex items-center gap-4">
-                  <div className="flex size-[64px] shrink-0 items-center justify-center rounded-full bg-brand/22 text-brand-bright">
-                    <Icon size={30} />
+                {/* a real bike of that type, one they can actually get on these dates */}
+                {best.sample && (
+                  <div className="h-[150px] overflow-hidden rounded-field bg-white/5">
+                    <BikeImage bike={best.sample} className="object-contain p-4" />
                   </div>
-                  <div className="flex flex-col gap-[4px]">
-                    <Lbl className="text-brand-bright">Best match{answered ? "" : " so far"}</Lbl>
-                    <h3 className="text-[24px] font-semibold leading-[1.15] tracking-[-.016em]">{capitalise(CATEGORY_NOUN[best.category])}</h3>
-                  </div>
+                )}
+                <div className="flex flex-col gap-[4px]">
+                  <Lbl className="text-brand-bright">Best match{answered ? "" : " so far"}</Lbl>
+                  <h3 className="text-[24px] font-semibold leading-[1.15] tracking-[-.016em]">{capitalise(CATEGORY_NOUN[best.category])}</h3>
+                  {best.sample && <span className="text-[13px] text-ink-mute">Pictured: {best.sample.name}</span>}
                 </div>
                 <div className="flex flex-col gap-[10px]">
                   {best.reasons.map((r) => (
@@ -157,9 +157,14 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
                   <div className="flex flex-col gap-[11px] border-t border-white/6 pt-[15px]">
                     <Lbl>Also fine for this</Lbl>
                     {alternatives.map((a) => (
-                      <Form key={a.category} method="post" action={here} className="flex items-center justify-between gap-3">
+                      <Form key={a.category} method="post" action={here} className="flex items-center gap-3">
                         <input type="hidden" name="cat" value={a.category} />
-                        <button className="min-w-0 truncate text-left text-[14.5px] font-semibold text-ink hover:text-brand-bright">{capitalise(CATEGORY_NOUN[a.category])} ›</button>
+                        {a.sample && (
+                          <span className="h-[44px] w-[64px] shrink-0 overflow-hidden rounded-plaque">
+                            <BikeImage bike={a.sample} className="p-[3px]" />
+                          </span>
+                        )}
+                        <button className="min-w-0 flex-1 truncate text-left text-[14.5px] font-semibold text-ink hover:text-brand-bright">{capitalise(CATEGORY_NOUN[a.category])} ›</button>
                         <span className="num shrink-0 text-[14px] text-ink-mute">
                           {a.fromMinor != null ? `from ${Math.round(a.fromMinor / 100)} · ` : ""}
                           {a.free} free

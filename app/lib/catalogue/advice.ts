@@ -73,6 +73,8 @@ export function preferredCategories(terrain: Terrain | null, effort: Effort | nu
 export interface CategoryAdvice {
   category: BikeCategory;
   reasons: string[];
+  /** A bike of this type to show — the one with the most free on these dates, so the picture is of something they can actually get. */
+  sample: Pick<CatalogueBike, "image" | "name" | "category"> | null;
   /** Bikes of this type free on the dates, all sizes. */
   free: number;
   /** Distinct frame sizes among the free ones. */
@@ -85,9 +87,11 @@ export function adviseCategories(bikes: CatalogueBike[], terrain: Terrain | null
   return preferredCategories(terrain, effort)
     .map((category) => {
       const free = bikes.filter((b) => b.category === category && b.free > 0);
+      const sample = [...free].sort((a, b) => Number(Boolean(b.image)) - Number(Boolean(a.image)) || b.free - a.free)[0] ?? null;
       return {
         category,
         reasons: REASONS[category][terrain ?? "villages"],
+        sample: sample ? { image: sample.image, name: sample.name, category: sample.category } : null,
         free: free.reduce((n, b) => n + b.free, 0),
         sizes: new Set(free.map((b) => b.sizeLabel ?? b.id)).size,
         fromMinor: free.length ? Math.min(...free.map((b) => b.rateMinor)) : null,
