@@ -2,6 +2,7 @@
  * The board on the counter: who is collecting today, who is bringing bikes
  * back, who is late, and which holds are still waiting for a card.
  */
+import { Link } from "react-router";
 import type { Route } from "./+types/today";
 import { cloudflareContext } from "~/context";
 import { requireStaff } from "~/lib/admin/auth";
@@ -36,9 +37,14 @@ export default function Today({ loaderData, actionData }: Route.ComponentProps) 
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-display text-[28px] font-bold tracking-[-.02em]">{fmtLongDay(now)}</h1>
-        <span className="num text-[14px] text-ink-mute">
-          {board.counts.confirmedAhead} confirmed ahead · {board.counts.heldNow} holds open
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="num text-[14px] text-ink-mute">
+            {board.counts.confirmedAhead} confirmed ahead · {board.counts.heldNow} holds open
+          </span>
+          <Link to="/admin/new" className="rounded-full bg-white px-4 py-[8px] text-[14px] font-bold text-night hover:bg-ink-pale">
+            + New booking
+          </Link>
+        </div>
       </div>
       {actionData && <Flash ok={actionData.ok}>{actionData.message}</Flash>}
 

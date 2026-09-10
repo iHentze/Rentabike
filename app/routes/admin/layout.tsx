@@ -25,6 +25,7 @@ const NAV = [
   { to: "/admin", label: "Today", end: true },
   { to: "/admin/bookings", label: "Bookings" },
   { to: "/admin/stock", label: "Stock" },
+  { to: "/admin/new", label: "+ New booking" },
 ];
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {

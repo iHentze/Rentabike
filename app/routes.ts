@@ -24,6 +24,7 @@ export default [
   // The counter — staff only, see app/lib/admin/auth.ts.
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/today.tsx"),
+    route("new", "routes/admin/new.tsx"),
     route("login", "routes/admin/login.tsx"),
     route("logout", "routes/admin/logout.ts"),
     route("bookings", "routes/admin/bookings.tsx"),

@@ -25,7 +25,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const booking = await getBookingById(env.DB, params.id);
   if (!booking) throw new Response("Not found", { status: 404 });
   const [audit, payments] = await Promise.all([auditFor(env.DB, booking.id), paymentsFor(env.DB, booking.id)]);
-  return { booking, audit, payments, can: allowedFrom(booking.status as BookingStatus), epay: Boolean(env.EPAY_API_KEY && env.EPAY_POS_ID) };
+  // Straight from the counter form: say so once.
+  const justBooked = new URL(request.url).searchParams.get("new") === booking.code;
+  return { booking, audit, payments, can: allowedFrom(booking.status as BookingStatus), epay: Boolean(env.EPAY_API_KEY && env.EPAY_POS_ID), justBooked };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
@@ -45,10 +47,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 const BTN = "rounded-full px-[16px] py-[9px] text-[14px] font-semibold";
 
 export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
-  const { booking: b, audit, payments, can, epay } = loaderData;
+  const { booking: b, audit, payments, can, epay, justBooked } = loaderData;
   const bikes = b.lines.filter((l) => l.kind === "bike" || l.kind === "tour_seat");
   const rest = b.lines.filter((l) => l.kind === "addon" || l.kind === "fee");
-  const owed = b.paymentMethod === "shop" ? b.totalMinor : Math.max(0, b.totalMinor - (b.paidMinor - b.refundedMinor));
+  // Whatever is not yet paid — by card online or in cash at the counter — is what the counter still takes.
+  const owed = Math.max(0, b.totalMinor - (b.paidMinor - b.refundedMinor));
   const authorisedOnly = payments.some((p) => p.status === "authorized");
 
   return (
@@ -62,6 +65,14 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         <span className="text-[13px] text-ink-mute">{b.kind === "tour" ? "Tour" : "Rental"} · booked {fmtDayTime(b.createdAt)}</span>
       </div>
       {actionData && <Flash ok={actionData.ok}>{actionData.message}</Flash>}
+      {justBooked && !actionData && (
+        <Flash ok>
+          Booked at the counter as {b.code}.{b.customerEmail ? " The confirmation is on its way." : " No email on this one — the code is what they bring."}{" "}
+          <Link to="/admin/new" className="font-semibold underline">
+            Take another
+          </Link>
+        </Flash>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-5">
@@ -129,7 +140,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             </div>
             <div className="mt-3 grid gap-2 text-[14px] sm:grid-cols-3">
               <div>
-                <div className="lbl">On the card</div>
+                <div className="lbl">Paid so far</div>
                 <div className="num text-[16px] font-semibold">{formatDKKCode(b.paidMinor)}</div>
               </div>
               <div>
