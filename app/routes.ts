@@ -24,11 +24,17 @@ export default [
   // The counter — staff only, see app/lib/admin/auth.ts.
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/today.tsx"),
+    route("new", "routes/admin/new.tsx"),
     route("login", "routes/admin/login.tsx"),
     route("logout", "routes/admin/logout.ts"),
     route("bookings", "routes/admin/bookings.tsx"),
     route("bookings/:id", "routes/admin/booking.tsx"),
     route("stock", "routes/admin/stock.tsx"),
+    route("tours", "routes/admin/tours.tsx"),
+    route("fleet", "routes/admin/fleet.tsx"),
+    route("bikes/:id", "routes/admin/bike.tsx"),
+    route("prices", "routes/admin/prices.tsx"),
+    route("tours/:id", "routes/admin/tour.tsx"),
   ]),
   route("health", "routes/health.ts"),
   // Catalogue photos, fetched from the shop by the Worker and cached at the edge.

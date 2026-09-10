@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 /**
  * One booking, everything about it, and the buttons that move it. The
  * audit trail is at the bottom because that is where the question "who did
@@ -8,7 +9,7 @@ import type { Route } from "./+types/booking";
 import { cloudflareContext } from "~/context";
 import { requireStaff } from "~/lib/admin/auth";
 import { auditFor, paymentsFor } from "~/lib/admin/queries";
-import { staffAction, type StaffIntent } from "~/lib/admin/actions";
+import { staffAction, swapBike, swapCandidates, type StaffIntent } from "~/lib/admin/actions";
 import { getBookingById } from "~/lib/booking/lookup";
 import { allowedFrom } from "~/lib/booking/lifecycle";
 import type { BookingStatus } from "~/db/schema";
@@ -25,7 +26,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const booking = await getBookingById(env.DB, params.id);
   if (!booking) throw new Response("Not found", { status: 404 });
   const [audit, payments] = await Promise.all([auditFor(env.DB, booking.id), paymentsFor(env.DB, booking.id)]);
-  return { booking, audit, payments, can: allowedFrom(booking.status as BookingStatus), epay: Boolean(env.EPAY_API_KEY && env.EPAY_POS_ID) };
+  const url = new URL(request.url);
+  // Straight from the counter form: say so once.
+  const justBooked = url.searchParams.get("new") === booking.code;
+  // "Change" on a bike line: the bikes that could take its place over this booking's window.
+  const swap = url.searchParams.get("swap");
+  const candidates = swap ? await swapCandidates(env.DB, booking, swap) : [];
+  return { booking, audit, payments, can: allowedFrom(booking.status as BookingStatus), epay: Boolean(env.EPAY_API_KEY && env.EPAY_POS_ID), justBooked, swap, candidates };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
@@ -34,6 +41,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const booking = await getBookingById(env.DB, params.id);
   if (!booking) throw new Response("Not found", { status: 404 });
   const form = await request.formData();
+  if (form.get("intent") === "swap") {
+    return swapBike(env.DB, booking, String(form.get("line") ?? ""), String(form.get("bike") ?? ""), staff.actor);
+  }
   const intent = String(form.get("intent") ?? "") as StaffIntent;
   return staffAction(env, ctx, booking, intent, staff.actor, {
     reason: String(form.get("reason") ?? "").trim().slice(0, 300) || undefined,
@@ -45,10 +55,12 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 const BTN = "rounded-full px-[16px] py-[9px] text-[14px] font-semibold";
 
 export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
-  const { booking: b, audit, payments, can, epay } = loaderData;
+  const { booking: b, audit, payments, can, epay, justBooked, swap, candidates } = loaderData;
+  const swappable = ["held", "confirmed", "picked_up"].includes(b.status);
   const bikes = b.lines.filter((l) => l.kind === "bike" || l.kind === "tour_seat");
   const rest = b.lines.filter((l) => l.kind === "addon" || l.kind === "fee");
-  const owed = b.paymentMethod === "shop" ? b.totalMinor : Math.max(0, b.totalMinor - (b.paidMinor - b.refundedMinor));
+  // Whatever is not yet paid — by card online or in cash at the counter — is what the counter still takes.
+  const owed = Math.max(0, b.totalMinor - (b.paidMinor - b.refundedMinor));
   const authorisedOnly = payments.some((p) => p.status === "authorized");
 
   return (
@@ -62,6 +74,14 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         <span className="text-[13px] text-ink-mute">{b.kind === "tour" ? "Tour" : "Rental"} · booked {fmtDayTime(b.createdAt)}</span>
       </div>
       {actionData && <Flash ok={actionData.ok}>{actionData.message}</Flash>}
+      {justBooked && !actionData && (
+        <Flash ok>
+          Booked at the counter as {b.code}.{b.customerEmail ? " The confirmation is on its way." : " No email on this one — the code is what they bring."}{" "}
+          <Link to="/admin/new" className="font-semibold underline">
+            Take another
+          </Link>
+        </Flash>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-5">
@@ -104,15 +124,47 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             <table className="w-full text-[14px]">
               <tbody>
                 {[...bikes, ...rest].map((l, i) => (
-                  <tr key={i} className="border-b border-white/6 last:border-0">
-                    <td className="px-5 py-[10px]">
-                      {l.riderLabel && <span className="font-semibold">{l.riderLabel} · </span>}
-                      {l.qty > 1 ? `${l.qty} × ` : ""}
-                      {l.label}
-                      {l.sizeLabel ? <span className="text-ink-mute"> · {l.sizeLabel}</span> : null}
-                    </td>
-                    <td className="num px-5 py-[10px] text-right">{l.lineTotalMinor === 0 ? <span className="text-ok">included</span> : formatDKKCode(l.lineTotalMinor)}</td>
-                  </tr>
+                  <Fragment key={l.id ?? i}>
+                    <tr className="border-b border-white/6 last:border-0">
+                      <td className="px-5 py-[10px]">
+                        {l.riderLabel && <span className="font-semibold">{l.riderLabel} · </span>}
+                        {l.qty > 1 ? `${l.qty} × ` : ""}
+                        {l.label}
+                        {l.sizeLabel ? <span className="text-ink-mute"> · {l.sizeLabel}</span> : null}
+                        {l.kind === "bike" && swappable && (
+                          <Link to={swap === l.id ? `/admin/bookings/${b.id}` : `/admin/bookings/${b.id}?swap=${l.id}#swap`} className="ml-3 text-[13px] font-semibold text-brand-bright hover:text-ink">
+                            {swap === l.id ? "Keep it" : "Change"}
+                          </Link>
+                        )}
+                      </td>
+                      <td className="num px-5 py-[10px] text-right">{l.lineTotalMinor === 0 ? <span className="text-ok">included</span> : formatDKKCode(l.lineTotalMinor)}</td>
+                    </tr>
+                    {swap === l.id && (
+                      <tr id="swap" className="border-b border-white/6 bg-brand/8">
+                        <td colSpan={2} className="px-5 py-3">
+                          {candidates.length === 0 ? (
+                            <span className="text-[13.5px] text-ink-soft">Nothing else is free for these dates{b.kind === "tour" ? " on this tour" : ""}.</span>
+                          ) : (
+                            <Form method="post" className="flex flex-wrap items-center gap-2">
+                              <input type="hidden" name="intent" value="swap" />
+                              <input type="hidden" name="line" value={l.id} />
+                              <select name="bike" className="min-w-[280px] flex-1 rounded-field bg-white/10 px-[11px] py-[8px] text-[13.5px] shadow-[inset_0_0_0_1px_rgba(255,255,255,.13)] focus:outline-2 focus:outline-brand-bright">
+                                {candidates.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                    {c.riderMinCm && c.riderMaxCm ? ` · ${c.riderMinCm}–${c.riderMaxCm} cm` : ""} · {c.free} free
+                                    {b.kind === "tour" ? "" : ` · ${formatDKKCode(c.tripMinor)}${c.tripMinor !== l.lineTotalMinor ? ` (${c.tripMinor > l.lineTotalMinor ? "+" : "−"}${formatDKKCode(Math.abs(c.tripMinor - l.lineTotalMinor)).replace("DKK ", "")})` : ""}`}
+                                  </option>
+                                ))}
+                              </select>
+                              <button className="rounded-full bg-white px-4 py-[8px] text-[13.5px] font-bold text-night hover:bg-ink-pale">Swap</button>
+                              <span className="text-[12.5px] text-ink-mute">Same dates, re-priced for the new bike; the difference is settled at the counter.</span>
+                            </Form>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
                 <tr>
                   <td className="px-5 py-3 text-[15px] font-semibold">Total</td>
@@ -129,7 +181,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             </div>
             <div className="mt-3 grid gap-2 text-[14px] sm:grid-cols-3">
               <div>
-                <div className="lbl">On the card</div>
+                <div className="lbl">Paid so far</div>
                 <div className="num text-[16px] font-semibold">{formatDKKCode(b.paidMinor)}</div>
               </div>
               <div>
@@ -222,8 +274,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               <span className="w-[120px] font-semibold">{a.actor}</span>
               <span className="text-ink-soft">
                 {a.entity === "payment" ? "payment " : ""}
-                {a.fromStatus ?? "—"} → {a.toStatus ?? "—"}
-                {a.note ? ` · ${a.note}` : ""}
+                {a.fromStatus == null && a.toStatus == null ? (a.note ?? "") : `${a.fromStatus ?? "—"} → ${a.toStatus ?? "—"}${a.note ? ` · ${a.note}` : ""}`}
               </span>
             </li>
           ))}

@@ -28,9 +28,9 @@ const booking: BookingView = {
   holdExpiresAt: null,
   createdAt: T0 - 86_400_000,
   lines: [
-    { kind: "bike", label: "Cube Dual Suspension", riderLabel: "Jóhanna", qty: 1, unitPriceMinor: 40000, lineTotalMinor: 120000, bikeTypeId: "cube-m", sizeLabel: "Medium", tourDepartureId: null },
-    { kind: "addon", label: "Helmet for rent", riderLabel: "Jóhanna", qty: 1, unitPriceMinor: 5000, lineTotalMinor: 5000, bikeTypeId: null, sizeLabel: null, tourDepartureId: null },
-    { kind: "fee", label: "Pickup at Airport", riderLabel: null, qty: 1, unitPriceMinor: 49000, lineTotalMinor: 49000, bikeTypeId: null, sizeLabel: null, tourDepartureId: null },
+    { id: "line-1", kind: "bike", label: "Cube Dual Suspension", riderLabel: "Jóhanna", qty: 1, unitPriceMinor: 40000, lineTotalMinor: 120000, bikeTypeId: "cube-m", sizeLabel: "Medium", tourDepartureId: null },
+    { id: "line-2", kind: "addon", label: "Helmet for rent", riderLabel: "Jóhanna", qty: 1, unitPriceMinor: 5000, lineTotalMinor: 5000, bikeTypeId: null, sizeLabel: null, tourDepartureId: null },
+    { id: "line-3", kind: "fee", label: "Pickup at Airport", riderLabel: null, qty: 1, unitPriceMinor: 49000, lineTotalMinor: 49000, bikeTypeId: null, sizeLabel: null, tourDepartureId: null },
   ],
 };
 

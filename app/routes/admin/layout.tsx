@@ -24,7 +24,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 const NAV = [
   { to: "/admin", label: "Today", end: true },
   { to: "/admin/bookings", label: "Bookings" },
+  { to: "/admin/tours", label: "Tours" },
+  { to: "/admin/fleet", label: "Fleet" },
   { to: "/admin/stock", label: "Stock" },
+  { to: "/admin/prices", label: "Prices & places" },
+  { to: "/admin/new", label: "+ New booking" },
 ];
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {

@@ -248,3 +248,92 @@ export async function stockList(d1: D1Database, at = Date.now()): Promise<StockR
     outToday: (r.out_today as number) ?? 0,
   }));
 }
+
+/** Everyone booked on one departure, live bookings first: who is coming on Saturday's ride. */
+export async function bookingsOnDeparture(d1: D1Database, departureId: string): Promise<BookingRow[]> {
+  const rows = await d1
+    .prepare(
+      `${ROW}
+        WHERE b.id IN (SELECT bl.booking_id FROM booking_lines bl WHERE bl.kind = 'tour_seat' AND bl.tour_departure_id = ?1)
+        ORDER BY CASE WHEN b.status IN ('held','confirmed','picked_up') THEN 0 ELSE 1 END, b.created_at`,
+    )
+    .bind(departureId)
+    .all<Record<string, unknown>>();
+  return (rows.results ?? []).map(toRow);
+}
+
+// ---------------------------------------------------------------------------
+// The fleet board — units out per bike type per day, rentals and tours on one
+// counter, because tour bikes are ordinary bike lines (rule B2).
+// ---------------------------------------------------------------------------
+
+export interface FleetDay {
+  date: string;
+  start: number;
+  end: number;
+  /** Tour departures leaving that day, so a full column has an explanation. */
+  departures: number;
+}
+
+export interface FleetTypeRow {
+  id: string;
+  name: string;
+  category: string;
+  sizeLabel: string | null;
+  stock: number;
+  listed: boolean;
+  /** Units out on each day of the board, in day order. */
+  out: number[];
+}
+
+export interface FleetBoard {
+  days: FleetDay[];
+  types: FleetTypeRow[];
+}
+
+export async function fleetBoard(d1: D1Database, fromDate: string, dayCount: number): Promise<FleetBoard> {
+  const days: FleetDay[] = [];
+  for (let i = 0; i < dayCount; i++) {
+    const date = shiftIso(fromDate, i);
+    const { start, end } = dayBounds(date);
+    days.push({ date, start, end, departures: 0 });
+  }
+  const winStart = days[0]!.start;
+  const winEnd = days[days.length - 1]!.end;
+  const [types, lines, deps] = await Promise.all([
+    d1.prepare(`SELECT id, name, category, size_label, stock, listed FROM bike_types WHERE category <> 'extra' ORDER BY category, name, rider_min_cm`).all<{ id: string; name: string; category: string; size_label: string | null; stock: number; listed: number }>(),
+    d1
+      .prepare(
+        `SELECT bl.bike_type_id, bl.qty, b.start_at, b.end_at
+           FROM booking_lines bl JOIN bookings b ON b.id = bl.booking_id
+          WHERE bl.kind = 'bike' AND b.status IN ('held','confirmed','picked_up') AND b.start_at < ?2 AND b.end_at > ?1`,
+      )
+      .bind(winStart, winEnd)
+      .all<{ bike_type_id: string; qty: number; start_at: number; end_at: number }>(),
+    d1.prepare(`SELECT starts_at FROM tour_departures WHERE status IN ('open','closed') AND starts_at >= ?1 AND starts_at < ?2`).bind(winStart, winEnd).all<{ starts_at: number }>(),
+  ]);
+  for (const d of deps.results ?? []) {
+    const day = days.find((x) => d.starts_at >= x.start && d.starts_at < x.end);
+    if (day) day.departures += 1;
+  }
+  const out = new Map<string, number[]>();
+  for (const t of types.results ?? []) out.set(t.id, days.map(() => 0));
+  for (const l of lines.results ?? []) {
+    const row = out.get(l.bike_type_id);
+    if (!row) continue;
+    days.forEach((day, i) => {
+      if (l.start_at < day.end && l.end_at > day.start) row[i] = (row[i] ?? 0) + l.qty;
+    });
+  }
+  return {
+    days,
+    types: (types.results ?? []).map((t) => ({ id: t.id, name: t.name, category: t.category, sizeLabel: t.size_label, stock: t.stock, listed: Boolean(t.listed), out: out.get(t.id) ?? [] })),
+  };
+}
+
+/** "2026-06-12" + n days, on the calendar, no time zone involved. */
+function shiftIso(date: string, n: number): string {
+  const [y = 0, m = 1, d = 1] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return t.toISOString().slice(0, 10);
+}

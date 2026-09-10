@@ -23,7 +23,11 @@ export function StatusChip({ status }: { status: string }) {
 }
 
 export function PayChip({ b }: { b: Pick<BookingRow, "paymentMethod" | "paidMinor" | "refundedMinor" | "totalMinor" | "status"> }) {
-  if (b.paymentMethod === "shop") return <span className="text-[12.5px] text-ink-mute">pay at counter</span>;
+  if (b.paymentMethod === "shop") {
+    // Money taken at the counter is recorded on the booking; the card path never sets this without a card row.
+    if (b.totalMinor > 0 && b.paidMinor - b.refundedMinor >= b.totalMinor) return <span className="text-[12.5px] font-semibold text-ok">paid at counter</span>;
+    return <span className="text-[12.5px] text-ink-mute">pay at counter</span>;
+  }
   const net = b.paidMinor - b.refundedMinor;
   if (b.refundedMinor > 0) return <span className="text-[12.5px] text-ink-mute">refunded {formatDKKCode(b.refundedMinor)}</span>;
   if (net >= b.totalMinor && b.totalMinor > 0) return <span className="text-[12.5px] font-semibold text-ok">paid by card</span>;

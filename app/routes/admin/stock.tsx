@@ -1,4 +1,4 @@
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 import type { Route } from "./+types/stock";
 import { cloudflareContext } from "~/context";
 import { requireStaff } from "~/lib/admin/auth";
@@ -29,7 +29,7 @@ export default function Stock({ loaderData, actionData }: Route.ComponentProps) 
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-[28px] font-bold tracking-[-.02em]">Stock</h1>
-        <p className="text-[14.5px] text-ink-soft">Units per size. "Out" is how many are booked or on the road today; a change is logged with your name.</p>
+        <p className="text-[14.5px] text-ink-soft">Units per size. "Out" is how many are booked or on the road today; a change is logged with your name. Open a bike to change its name, size, rider range, prices or whether it is listed.</p>
       </div>
       {actionData && <Flash ok={actionData.ok}>{actionData.message}</Flash>}
       {[...groups.entries()].map(([category, list]) => (
@@ -49,7 +49,9 @@ export default function Stock({ loaderData, actionData }: Route.ComponentProps) 
               {list.map((r) => (
                 <tr key={r.id} className={cx("border-t border-white/6", !r.listed && "opacity-60")}>
                   <td className="px-4 py-2 font-semibold">
-                    {r.name}
+                    <Link to={`/admin/bikes/${r.id}`} className="hover:text-brand-bright">
+                      {r.name}
+                    </Link>
                     {!r.listed && <span className="ml-2 text-[11px] font-bold uppercase text-ink-mute">unlisted</span>}
                   </td>
                   <td className="px-3 py-2 text-ink-soft">{r.sizeLabel ?? "—"}</td>
