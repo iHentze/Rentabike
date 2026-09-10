@@ -33,18 +33,27 @@ export async function overpass(key: string, query: string, fetchFresh: boolean):
     return (JSON.parse(readFileSync(file, "utf8")) as { elements: OsmElement[] }).elements;
   }
   let lastError: unknown;
-  for (const url of ENDPOINTS) {
-    try {
-      const res = await fetch(url, { method: "POST", body: `data=${encodeURIComponent(query)}`, headers: { "content-type": "application/x-www-form-urlencoded" } });
-      if (!res.ok) throw new Error(`${url} → ${res.status}`);
-      const json = (await res.json()) as { elements: OsmElement[] };
-      writeFileSync(file, JSON.stringify({ fetched: new Date().toISOString(), query, elements: json.elements }));
-      console.log(`${key}: ${json.elements.length} elements from ${url}`);
-      return json.elements;
-    } catch (e) {
-      lastError = e;
-      console.warn(`${key}: ${String(e)}`);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    for (const url of ENDPOINTS) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          body: `data=${encodeURIComponent(query)}`,
+          headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", "user-agent": "rentabike-map-build/1.0 (https://rentabike.fo; rentabike@rentabike.fo)" },
+        });
+        if (res.status === 429 || res.status === 504) throw new Error(`${url} → ${res.status}, busy`);
+        if (!res.ok) throw new Error(`${url} → ${res.status}`);
+        const json = (await res.json()) as { elements: OsmElement[] };
+        writeFileSync(file, JSON.stringify({ fetched: new Date().toISOString(), query, elements: json.elements }));
+        console.log(`${key}: ${json.elements.length} elements from ${url}`);
+        return json.elements;
+      } catch (e) {
+        lastError = e;
+        console.warn(`${key}: ${String(e)}`);
+      }
     }
+    // The public servers rate-limit by IP; give them a moment before the next round.
+    await new Promise((r) => setTimeout(r, 20000 * (attempt + 1)));
   }
   if (existsSync(file)) {
     console.warn(`${key}: every endpoint failed, using the cached copy`);

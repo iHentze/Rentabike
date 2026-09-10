@@ -1,3 +1,36 @@
 import type { MapLabel } from "./types";
 
-export const LABELS: MapLabel[] = [];
+/** Islands in letter-spaced italics, the four regions faint and large, a few named features. */
+export const LABELS: MapLabel[] = [
+  { id: "streymoy", text: "Streymoy", at: [-7.02, 62.185], kind: "island", size: "lg", rotate: -50 },
+  { id: "eysturoy", text: "Eysturoy", at: [-6.87, 62.31], kind: "island", size: "lg", rotate: -40 },
+  { id: "vagar", text: "Vágar", at: [-7.27, 62.07], kind: "island", size: "md" },
+  { id: "mykines", text: "Mykines", at: [-7.64, 62.105], kind: "island", size: "sm" },
+  { id: "sandoy", text: "Sandoy", at: [-6.79, 61.865], kind: "island", size: "md" },
+  { id: "suduroy", text: "Suðuroy", at: [-6.83, 61.49], kind: "island", size: "md", rotate: -55 },
+  { id: "bordoy", text: "Borðoy", at: [-6.56, 62.24], kind: "island", size: "sm", rotate: -60 },
+  { id: "vidoy", text: "Viðoy", at: [-6.49, 62.34], kind: "island", size: "sm", rotate: -60 },
+  { id: "kunoy", text: "Kunoy", at: [-6.67, 62.31], kind: "island", size: "sm", rotate: -70 },
+  { id: "kalsoy", text: "Kalsoy", at: [-6.76, 62.33], kind: "island", size: "sm", rotate: -70 },
+  { id: "fugloy", text: "Fugloy", at: [-6.28, 62.35], kind: "island", size: "sm" },
+  { id: "svinoy", text: "Svínoy", at: [-6.34, 62.265], kind: "island", size: "sm" },
+  { id: "nolsoy", text: "Nólsoy", at: [-6.63, 61.975], kind: "island", size: "sm", rotate: -60 },
+  { id: "hestur", text: "Hestur", at: [-6.88, 61.945], kind: "island", size: "sm" },
+  { id: "koltur", text: "Koltur", at: [-6.98, 62.0], kind: "island", size: "sm" },
+  { id: "skuvoy", text: "Skúgvoy", at: [-6.83, 61.765], kind: "island", size: "sm" },
+  { id: "stora-dimun", text: "Stóra Dímun", at: [-6.75, 61.685], kind: "island", size: "sm" },
+  { id: "litla-dimun", text: "Lítla Dímun", at: [-6.70, 61.63], kind: "island", size: "sm" },
+  { id: "northern-isles", text: "Northern Isles", at: [-6.32, 62.45], kind: "region", rotate: -45 },
+  { id: "central-isles", text: "Central Isles", at: [-6.58, 62.12], kind: "region", rotate: -60 },
+  { id: "western-isles", text: "Western Isles", at: [-7.32, 61.98], kind: "region", rotate: 30 },
+  { id: "southern-isles", text: "Southern Isles", at: [-6.98, 61.72], kind: "region", rotate: -80 },
+  { id: "sunnanfjords", text: "Sunnanfjørðs", at: [-6.93, 61.72], kind: "water", rotate: -80 },
+  { id: "skopunarfjordur", text: "Skopunarfjørður", at: [-6.83, 61.93], kind: "water", rotate: 10 },
+  { id: "slaettaratindur", text: "Slættaratindur 880 m", at: [-6.99, 62.29], kind: "natural" },
+  { id: "risin", text: "Risin & Kellingin", at: [-7.06, 62.33], kind: "natural" },
+  { id: "tindholmur", text: "Tindhólmur", at: [-7.45, 62.085], kind: "natural" },
+  { id: "sorvagsvatn", text: "Sørvágsvatn / Leitisvatn", at: [-7.28, 62.05], kind: "natural" },
+  { id: "fjallavatn", text: "Fjallavatn", at: [-7.33, 62.10], kind: "natural" },
+  { id: "leynavatn", text: "Leynavatn", at: [-7.02, 62.12], kind: "natural" },
+  { id: "traelanipa", text: "Trælanípa", at: [-7.24, 62.02], kind: "natural" },
+];

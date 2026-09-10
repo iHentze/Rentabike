@@ -32,7 +32,10 @@ const args = new Set(process.argv.slice(2));
 const fetchFresh = args.has("--fetch");
 
 async function main() {
-  const [roadsRaw, ferriesRaw, placesRaw] = await Promise.all([overpass("roads", QUERIES.roads, fetchFresh), overpass("ferries", QUERIES.ferries, fetchFresh), overpass("places", QUERIES.places, fetchFresh)]);
+  // One query at a time: the public Overpass servers rate-limit parallel calls.
+  const placesRaw = await overpass("places", QUERIES.places, fetchFresh);
+  const ferriesRaw = await overpass("ferries", QUERIES.ferries, fetchFresh);
+  const roadsRaw = await overpass("roads", QUERIES.roads, fetchFresh);
   const ways = roadsRaw.filter((e): e is OsmWay => e.type === "way");
   const places = placesRaw.filter((e): e is OsmNode => e.type === "node");
 
