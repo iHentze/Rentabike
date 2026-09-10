@@ -67,10 +67,10 @@ export const BBOX = "61.35,-7.75,62.45,-6.2";
 export const QUERIES = {
   roads: `[out:json][timeout:180];
 way["highway"~"^(trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service|track|cycleway|path)$"](${BBOX});
-out geom tags;`,
+out geom;`,
   ferries: `[out:json][timeout:60];
 way["route"="ferry"](${BBOX});
-out geom tags;`,
+out geom;`,
   places: `[out:json][timeout:60];
 (
   node["place"~"^(city|town|village|hamlet|locality|isolated_dwelling|island)$"](${BBOX});

@@ -46,7 +46,7 @@ export class RoadGraph {
     const uses = new Map<number, number>();
     for (const w of ways) for (const n of w.nodes) uses.set(n, (uses.get(n) ?? 0) + 1);
     for (const w of ways) {
-      if (w.nodes.length < 2 || !w.geometry) continue;
+      if (!Array.isArray(w.nodes) || w.nodes.length < 2 || !w.geometry) continue;
       w.nodes.forEach((n, i) => {
         const g = w.geometry[i];
         if (g) this.nodeCoord.set(n, [g.lon, g.lat]);
