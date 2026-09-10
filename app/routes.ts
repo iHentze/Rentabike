@@ -10,6 +10,8 @@ export default [
   route("checkout", "routes/checkout.tsx"),
   route("tours", "routes/tours.tsx"),
   route("tours/:slug", "routes/tours.$slug.tsx"),
+  // The cycling map — R Hokwerda's 2025 tour map, interactive.
+  route("map", "routes/map.tsx"),
   route("booking", "routes/booking.tsx"),
   route("booked/:code", "routes/booked.$code.tsx"),
   route("booked/:code/calendar.ics", "routes/booked.$code.calendar[.]ics.ts"),

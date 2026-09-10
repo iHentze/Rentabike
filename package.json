@@ -16,11 +16,15 @@
     "db:migrate:remote": "wrangler d1 migrations apply rentabike --remote",
     "db:seed:local": "tsx scripts/seed-local.ts > .wrangler/seed.sql && wrangler d1 migrations apply rentabike --local && wrangler d1 execute rentabike --local --file=.wrangler/seed.sql",
     "cf-typegen": "wrangler types",
-    "check:phone": "node scripts/phone-sweep.mjs"
+    "check:phone": "node scripts/phone-sweep.mjs",
+    "map:build": "tsx scripts/map/build-map-data.ts",
+    "map:list": "tsx scripts/map/build-map-data.ts --list",
+    "map:shot": "node scripts/map-shot.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "isbot": "^5.2.2",
+    "maplibre-gl": "^6.9.0",
     "react": "^19.2.8",
     "react-aria-components": "^1.21.1",
     "react-dom": "^19.2.8",
@@ -31,6 +35,7 @@
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@react-router/dev": "^8.3.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^22.20.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
