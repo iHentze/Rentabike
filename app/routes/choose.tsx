@@ -3,117 +3,69 @@ import type { Route } from "./+types/choose";
 import { cloudflareContext } from "~/context";
 import { Footer, Header, Shell, TripSummary } from "~/components/site";
 import { Card, Lbl, Price, cx } from "~/components/ui";
-import { BikeImage } from "~/components/bike-card";
-import { Check, Star, Wind } from "~/components/icons";
+import { Bolt, Check, Gravel, Mountain, Road, Star, Wind } from "~/components/icons";
 import { readTrip, tripDays, tripHref } from "~/lib/trip";
-import { basketHeaders, readBasket, ridersOn } from "~/lib/basket";
-import { listBikes, ridable, type CatalogueBike } from "~/lib/catalogue/bikes";
-import type { BikeCategory } from "~/db/schema";
-import { formatDKKCode } from "~/lib/money";
+import { basketHeaders, readBasket } from "~/lib/basket";
+import { CATEGORY_LABEL, listBikes, ridable } from "~/lib/catalogue/bikes";
+import { adviseCategories, CATEGORY_NOUN, EFFORT, isEffort, isTerrain, TERRAIN } from "~/lib/catalogue/advice";
+import { BIKE_CATEGORIES, type BikeCategory } from "~/db/schema";
 
 export function meta(_: Route.MetaArgs) {
   return [{ title: "Which bike suits you — Rent a Bike & Outdoor" }];
 }
 
-type Terrain = "town" | "villages" | "hills";
-type Effort = "all" | "some" | "little";
-
-const TERRAIN: Array<{ id: Terrain; title: string; text: string }> = [
-  { id: "town", title: "Around Tórshavn", text: "Harbour, old town, the cafés. Mostly flat, short hops, back before dinner." },
-  { id: "villages", title: "Out to the villages", text: "Kirkjubøur and the coast roads. Rolling, a few real climbs, 30–50 km in a day." },
-  { id: "hills", title: "Up into the hills", text: "Norðadalsskarð, Núgvan, the grass tracks. Proper ascent and loose ground." },
-];
-const EFFORT: Array<{ id: Effort; title: string; text: string }> = [
-  { id: "all", title: "All of it", text: "I ride at home and I want the climbs." },
-  { id: "some", title: "Some help on the hills", text: "Fit enough, but I'm on holiday." },
-  { id: "little", title: "As little as possible", text: "I want to look at the view, not the tarmac." },
-];
-
-/** Category order for each answer pair — first that has bikes free wins. */
-const PREFER: Record<Terrain, Record<Effort, BikeCategory[]>> = {
-  town: { little: ["ebike", "road", "gravel"], some: ["ebike", "gravel", "road"], all: ["road", "gravel", "ebike"] },
-  villages: { little: ["ebike", "gravel"], some: ["ebike", "gravel", "road"], all: ["gravel", "road", "ebike"] },
-  hills: { little: ["ebike", "mountain"], some: ["ebike", "mountain", "gravel"], all: ["mountain", "gravel", "ebike"] },
-};
-
-const REASONS: Record<BikeCategory, Record<Terrain, string[]>> = {
-  ebike: {
-    town: ["The motor flattens the hill up from the harbour", "Battery covers roughly 80 km — more than a day out here", "The one people pick again when they come back"],
-    villages: ["Handles the coast road and the pass to Kirkjubøur without the sweat", "Battery covers roughly 80 km — more than a day out here", "A headwind on the coast road stops mattering"],
-    hills: ["Motor and wide tyres for Norðadalsskarð and the grass tracks", "You arrive at the saddle with legs left for the view", "Battery covers roughly 80 km — more than a day out here"],
-  },
-  gravel: {
-    town: ["Quick on tarmac, comfortable over cobbles", "Drop bars for the exposed stretches along the water", "Light enough to carry up the old-town steps"],
-    villages: ["Handles the coast-road tarmac and the gravel stretch to Kirkjubøur", "Geared for the pass — 190 m, paved throughout", "Fast enough to make the 50 km day feel short"],
-    hills: ["Wide tyres for the loose ground on the plateau tracks", "Lower gears than a road bike for the long climb", "Still quick on the tarmac back down"],
-  },
-  road: {
-    town: ["Fastest thing on the coast road", "Paved the whole way round the capital", "Light and quick — the sightseeing loop in an hour"],
-    villages: ["The Kirkjubøur road is paved from door to door", "Built for exactly this: rolling tarmac and long views", "Clip-in pedals available if you ride at home"],
-    hills: ["Paved to the top of Norðadalsskarð — a proper road climb", "Fast descent home", "Skip the grass tracks; this one is for the tarmac"],
-  },
-  mountain: {
-    town: ["Comfortable and upright for a slow look around", "Fat tyres soak up the cobbles", "Nothing to worry about on the harbour paths"],
-    villages: ["Happy on the gravel stretches and farm tracks", "Suspension takes the rough patches out of the day", "Lower gears for the pass"],
-    hills: ["Knobbly tyres and suspension for grass tracks and loose ground", "The bike our guides ride on the Sunday tours", "Built to be ridden hard and washed afterwards"],
-  },
-  extra: { town: [], villages: [], hills: [] },
-};
-
-function pick(bikes: CatalogueBike[], cats: BikeCategory[], riders: number): { best: CatalogueBike | null; alternatives: CatalogueBike[] } {
-  const bestOf = (c: BikeCategory) =>
-    bikes
-      .filter((b) => b.category === c && b.free > 0)
-      // Enough for the whole party first, then the cheapest.
-      .sort((a, b) => Number(b.free >= riders) - Number(a.free >= riders) || a.rateMinor - b.rateMinor || b.free - a.free)[0] ?? null;
-  const picks = cats.map(bestOf).filter((b): b is CatalogueBike => b !== null);
-  return { best: picks[0] ?? null, alternatives: picks.slice(1, 3) };
-}
-
+/**
+ * Two questions, an answer in bike TYPES. The frame comes later: the riders
+ * step sizes it to each rider's height, one rider at a time. What this page
+ * decides is which type the riders step opens on, and why.
+ */
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);
   const url = new URL(request.url);
   const trip = readTrip(url.searchParams);
-  const terrain = (TERRAIN.find((t) => t.id === url.searchParams.get("t"))?.id ?? null) as Terrain | null;
-  const effort = (EFFORT.find((e) => e.id === url.searchParams.get("e"))?.id ?? null) as Effort | null;
+  const t = url.searchParams.get("t");
+  const e = url.searchParams.get("e");
+  const terrain = isTerrain(t) ? t : null;
+  const effort = isEffort(e) ? e : null;
   const bikes = ridable(await listBikes(env.DB, trip));
-  const days = tripDays(trip);
-  const cats = terrain && effort ? PREFER[terrain][effort] : terrain ? PREFER[terrain].some : effort ? PREFER.villages[effort] : [];
-  const { best, alternatives } = cats.length ? pick(bikes, cats, trip.riders) : { best: null, alternatives: [] };
-  const slim = (b: CatalogueBike) => ({ id: b.id, slug: b.slug, name: b.name, category: b.category, image: b.image, rateMinor: b.rateMinor, perDay: b.perDay, tripMinor: b.tripMinor, free: b.free, sizeLabel: b.sizeLabel });
+  const advice = adviseCategories(bikes, terrain, effort);
   return {
     trip: { startAt: trip.startAt.getTime(), endAt: trip.endAt.getTime(), riders: trip.riders, explicit: trip.explicit, pickupLocationId: trip.pickupLocationId, dropoffLocationId: trip.dropoffLocationId },
-    days,
+    days: tripDays(trip),
     terrain,
     effort,
     fleetFree: bikes.reduce((n, b) => n + b.free, 0),
-    best: best ? { ...slim(best), reasons: REASONS[best.category][terrain ?? "villages"] } : null,
-    alternatives: alternatives.map(slim),
+    best: advice[0] ?? null,
+    alternatives: advice.slice(1, 3),
   };
 }
 
-/** "Use this for both riders": everyone who still needs a bike gets this one, as far as stock allows. */
-export async function action({ context, request }: Route.ActionArgs) {
-  const { env } = context.get(cloudflareContext);
+/** "E-bikes it is": remember the type and the answers, then on to the riders — nothing is assigned yet. */
+export async function action({ request }: Route.ActionArgs) {
   const url = new URL(request.url);
   const trip = readTrip(url.searchParams);
   const form = await request.formData();
-  const bikeId = String(form.get("bike") ?? "");
+  const cat = String(form.get("cat") ?? "");
+  const t = url.searchParams.get("t");
+  const e = url.searchParams.get("e");
   const basket = await readBasket(request, trip);
-  const bike = (await listBikes(env.DB, trip)).find((b) => b.id === bikeId);
-  if (bike && bike.category !== "extra") {
-    for (const r of basket.riders) {
-      if (!r.bikeTypeId && ridersOn(basket, bike.id) < bike.free) r.bikeTypeId = bike.id;
-    }
+  const category = (BIKE_CATEGORIES as readonly string[]).includes(cat) && cat !== "extra" ? (cat as BikeCategory) : undefined;
+  if (category) {
+    basket.preferredCategory = category;
+    basket.advice = isTerrain(t) && isEffort(e) ? { terrain: t, effort: e } : undefined;
   }
-  return redirect(tripHref("/riders", trip), { headers: await basketHeaders(basket) });
+  return redirect(tripHref("/riders", trip, { cat: category }), { headers: await basketHeaders(basket) });
 }
+
+const ICON: Record<BikeCategory, typeof Bolt> = { ebike: Bolt, mountain: Mountain, gravel: Gravel, road: Road, extra: Bolt };
 
 export default function Choose({ loaderData }: Route.ComponentProps) {
   const { trip: t, days, terrain, effort, fleetFree, best, alternatives } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, pickupLocationId: t.pickupLocationId, dropoffLocationId: t.dropoffLocationId };
   const href = (extra: Record<string, string | undefined>) => tripHref("/choose", trip, { t: terrain ?? undefined, e: effort ?? undefined, ...extra });
   const here = tripHref("/choose", trip, { t: terrain ?? undefined, e: effort ?? undefined });
+  const answered = Boolean(terrain && effort);
+  const Icon = best ? ICON[best.category] : Star;
 
   return (
     <>
@@ -122,7 +74,7 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-[11px]">
             <h1 className="font-display text-[36px] font-bold leading-[1.03] tracking-[-.028em] md:text-[44px]">Where are you actually going?</h1>
-            <p className="max-w-[58ch] text-[17px] leading-[1.55] text-ink-soft">Two questions and we'll put the right bike under you. Ignore all of it and browse the lot instead — the link is at the bottom.</p>
+            <p className="max-w-[58ch] text-[17px] leading-[1.55] text-ink-soft">Two questions and we'll tell you which type of bike to take. The frame is sized to each rider on the next step. Ignore all of it and browse the lot instead — the link is at the bottom.</p>
           </div>
 
           <Question label="One" title="The riding you have in mind">
@@ -146,14 +98,14 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
           </Card>
 
           <div className="flex flex-wrap items-center gap-[18px]">
-            <Link to={tripHref("/bikes", trip)} className="border-b border-brand-bright/40 pb-[2px] text-[15px] font-semibold text-brand-bright hover:text-ink">
+            <Link to={tripHref("/riders", trip, { cat: "all" })} className="border-b border-brand-bright/40 pb-[2px] text-[15px] font-semibold text-brand-bright hover:text-ink">
               Skip this — show me all {fleetFree} bikes
             </Link>
-            <span className="text-[14px] text-ink-mute">You can change bikes right up to checkout.</span>
+            <span className="text-[14px] text-ink-mute">You can change type and bike right up to checkout.</span>
           </div>
         </div>
 
-        {/* recommendation */}
+        {/* recommendation: a type, with reasons and what the fleet has of it */}
         <Card className="overflow-hidden lg:sticky lg:top-6">
           <div className="flex items-center gap-[9px] bg-white/5 px-[18px] py-[15px]">
             <Star size={17} className="text-brand-bright" />
@@ -162,12 +114,14 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
           <div className="flex flex-col gap-4 p-[18px]">
             {best ? (
               <>
-                <div className="h-[140px] overflow-hidden rounded-field bg-white/5">
-                  <BikeImage bike={best} className="object-contain p-4" />
-                </div>
-                <div className="flex flex-col gap-[6px]">
-                  <Lbl className="text-brand-bright">Best match{!terrain || !effort ? " so far" : ""}</Lbl>
-                  <h3 className="text-[22px] font-semibold leading-[1.2] tracking-[-.014em]">{best.name}</h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex size-[64px] shrink-0 items-center justify-center rounded-full bg-brand/22 text-brand-bright">
+                    <Icon size={30} />
+                  </div>
+                  <div className="flex flex-col gap-[4px]">
+                    <Lbl className="text-brand-bright">Best match{answered ? "" : " so far"}</Lbl>
+                    <h3 className="text-[24px] font-semibold leading-[1.15] tracking-[-.016em]">{capitalise(CATEGORY_NOUN[best.category])}</h3>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-[10px]">
                   {best.reasons.map((r) => (
@@ -179,39 +133,44 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
                 </div>
                 <div className="flex items-baseline justify-between border-t border-white/6 pt-[15px]">
                   <div className="flex flex-col gap-[3px]">
-                    <Price minor={best.rateMinor} size="lg" />
-                    <span className="num text-[13px] text-ink-mute">
-                      {best.perDay ? `per day · ${days} days = ${formatDKKCode(best.tripMinor).replace("DKK ", "")}` : "for the period"}
-                    </span>
+                    {best.fromMinor != null ? (
+                      <span className="inline-flex items-baseline gap-[6px]">
+                        <span className="text-[13px] text-ink-mute">from</span>
+                        <Price minor={best.fromMinor} per="/day" size="lg" />
+                      </span>
+                    ) : (
+                      <span className="text-[15px] text-ink-soft">Included</span>
+                    )}
+                    <span className="num text-[13px] text-ink-mute">{days} {days === 1 ? "day" : "days"} · the frame is sized to each rider next</span>
                   </div>
                   <span className={cx("text-[13px] font-semibold", best.free >= trip.riders ? "text-ok" : "text-warn")}>
-                    {best.free >= trip.riders ? `${best.free} free` : `Only ${best.free} left`}
+                    {best.free} free · {best.sizes} {best.sizes === 1 ? "size" : "sizes"}
                   </span>
                 </div>
                 <Form method="post" action={here}>
-                  <input type="hidden" name="bike" value={best.id} />
+                  <input type="hidden" name="cat" value={best.category} />
                   <button className="w-full rounded-full bg-white px-4 py-[15px] text-[16px] font-bold text-night hover:bg-ink-pale">
-                    {trip.riders === 1 ? "Use this one" : trip.riders === 2 ? "Use this for both riders" : `Use this for all ${trip.riders} riders`}
+                    {trip.riders === 1 ? `${capitalise(CATEGORY_NOUN[best.category])} — now your height →` : `${CATEGORY_LABEL[best.category]} it is — now the riders →`}
                   </button>
                 </Form>
                 {alternatives.length > 0 && (
                   <div className="flex flex-col gap-[11px] border-t border-white/6 pt-[15px]">
                     <Lbl>Also fine for this</Lbl>
                     {alternatives.map((a) => (
-                      <div key={a.id} className="flex items-center justify-between gap-3">
-                        <Link to={tripHref(`/bikes/${a.slug}`, trip)} className="min-w-0 truncate text-[14.5px] hover:text-brand-bright">
-                          {a.name}
-                        </Link>
+                      <Form key={a.category} method="post" action={here} className="flex items-center justify-between gap-3">
+                        <input type="hidden" name="cat" value={a.category} />
+                        <button className="min-w-0 truncate text-left text-[14.5px] font-semibold text-ink hover:text-brand-bright">{capitalise(CATEGORY_NOUN[a.category])} ›</button>
                         <span className="num shrink-0 text-[14px] text-ink-mute">
-                          {Math.round(a.rateMinor / 100)} · {a.category === "ebike" ? "motor" : "no motor"}
+                          {a.fromMinor != null ? `from ${Math.round(a.fromMinor / 100)} · ` : ""}
+                          {a.free} free
                         </span>
-                      </div>
+                      </Form>
                     ))}
                   </div>
                 )}
               </>
             ) : (
-              <p className="text-[14.5px] leading-[1.55] text-ink-soft">Answer the two questions and the recommendation appears here — with the price for your dates and what's actually free.</p>
+              <p className="text-[14.5px] leading-[1.55] text-ink-soft">Answer the two questions and the recommendation appears here — the type of bike, why, and what's free on your dates.</p>
             )}
           </div>
         </Card>
@@ -219,6 +178,10 @@ export default function Choose({ loaderData }: Route.ComponentProps) {
       <Footer />
     </>
   );
+}
+
+function capitalise(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function Question({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {

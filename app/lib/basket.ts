@@ -6,6 +6,8 @@
  */
 import { createCookie } from "react-router";
 import { readTrip, tripHref, tripParams, type Trip } from "./trip";
+import { BIKE_CATEGORIES, type BikeCategory } from "~/db/schema";
+import { isEffort, isTerrain, type Effort, type Terrain } from "./catalogue/advice";
 
 export interface BasketRider {
   name?: string;
@@ -35,6 +37,14 @@ export interface Basket {
    * the home page or a tour pick the booking up again from where they were.
    */
   trip?: string;
+  /**
+   * The type of bike the riders step opens on: what the chooser advised, what
+   * the home page tile said, or what the previous rider took. A preference,
+   * never a restriction — every rider can switch with one tap.
+   */
+  preferredCategory?: BikeCategory;
+  /** The chooser's answers, so the riders step can say why it suggests the type it does. */
+  advice?: { terrain: Terrain; effort: Effort };
 }
 
 const cookie = createCookie("rb_basket", {
@@ -57,6 +67,8 @@ export async function readBasket(request: Request, trip: Trip): Promise<Basket> 
     dropoffLocationId: typeof raw?.dropoffLocationId === "string" ? raw.dropoffLocationId : undefined,
     autoSwap: raw?.autoSwap === true,
     trip: tripParams(trip).toString(),
+    preferredCategory: cleanCategory(raw?.preferredCategory),
+    advice: cleanAdvice(raw?.advice),
   };
   while (basket.riders.length < trip.riders) basket.riders.push({ addons: {} });
   basket.riders.length = trip.riders;
@@ -129,6 +141,18 @@ function cleanRider(r: unknown): BasketRider {
     extrasDone: o.extrasDone === true,
     helmetDeclined: o.helmetDeclined === true,
   };
+}
+
+function cleanCategory(v: unknown): BikeCategory | undefined {
+  return typeof v === "string" && (BIKE_CATEGORIES as readonly string[]).includes(v) && v !== "extra" ? (v as BikeCategory) : undefined;
+}
+
+function cleanAdvice(v: unknown): { terrain: Terrain; effort: Effort } | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
+  const o = v as Record<string, unknown>;
+  const terrain = typeof o.terrain === "string" ? o.terrain : null;
+  const effort = typeof o.effort === "string" ? o.effort : null;
+  return isTerrain(terrain) && isEffort(effort) ? { terrain, effort } : undefined;
 }
 
 function cleanCounts(v: unknown): Record<string, number> {

@@ -7,13 +7,15 @@ import { Card, Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
 import { Availability, BikeImage, riderRange } from "~/components/bike-card";
 import { SummaryRail } from "~/components/summary-rail";
 import { FunnelSteps } from "~/components/funnel-steps";
-import { Check, Info } from "~/components/icons";
+import { Check, Info, Star } from "~/components/icons";
 import { AddonsPanel, HELMET_ID } from "~/components/addons-panel";
 import { AddonCard } from "~/components/addon-card";
 import { tripDays, tripHref, MAX_RIDERS } from "~/lib/trip";
 import { resolveTrip } from "~/lib/tour-trip";
 import { assignBike, basketHeaders, nextStep, readBasket, riderLabel, riderReady, ridersOn, stepHref, unassignBike, type Basket } from "~/lib/basket";
-import { fitsRider, getAddonsById, listBikes, ridable, type CatalogueAddon } from "~/lib/catalogue/bikes";
+import { CATEGORY_LABEL, CATEGORY_ORDER, fitsRider, getAddonsById, listBikes, ridable, type CatalogueAddon } from "~/lib/catalogue/bikes";
+import { adviseCategories, CATEGORY_NOUN } from "~/lib/catalogue/advice";
+import { BIKE_CATEGORIES, type BikeCategory } from "~/db/schema";
 import { priceBasket } from "~/lib/quote-basket";
 import { fmtDays, fmtLongDay, fmtTime } from "~/lib/format";
 import { formatDKKCode } from "~/lib/money";
@@ -57,10 +59,16 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   const step: "bike" | "extras" = url.searchParams.get("step") === "bike" || !myBike || !ready ? "bike" : "extras";
   const showAll = url.searchParams.get("all") === "1";
 
+  // The type the list opens on: `cat` in the URL (a chip, a home-page tile, the chooser), else what the
+  // basket remembers — the chooser's advice or the previous rider's bike. "all" is every type.
+  const catParam = url.searchParams.get("cat");
+  const isCat = (v: string | null): v is BikeCategory => v !== null && (BIKE_CATEGORIES as readonly string[]).includes(v) && v !== "extra";
+  const category: BikeCategory | null = catParam === "all" ? null : isCat(catParam) ? catParam : (basket.preferredCategory ?? null);
+
   // Bikes for this rider: those that fit their height (or all, on request). Free ones first,
   // then frames whose stated range covers the rider, then frames that state no range at all.
   const hasRange = (b: { riderMinCm: number | null; riderMaxCm: number | null }) => b.riderMinCm != null && b.riderMaxCm != null;
-  const candidates = fleet
+  const fitting = fleet
     .filter((b) => showAll || fitsRider(b, rider.heightCm))
     .map((b) => ({ ...b, freeForRider: b.free - ridersOn(basket, b.id) + (rider.bikeTypeId === b.id ? 1 : 0), ranged: hasRange(b) && fitsRider(b, rider.heightCm) }))
     .sort(
@@ -70,6 +78,12 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         a.rateMinor - b.rateMinor ||
         a.name.localeCompare(b.name),
     );
+  // One chip per type, counted for this rider's height and dates. The rider's own bike always shows.
+  const chips = CATEGORY_ORDER.filter((c) => c !== "extra").map((c) => ({ category: c, label: CATEGORY_LABEL[c], free: fitting.filter((b) => b.category === c && b.freeForRider > 0).length }));
+  const candidates = category ? fitting.filter((b) => b.category === category || b.id === rider.bikeTypeId) : fitting;
+  // What the chooser said, if it said anything and it still holds for this type.
+  const advised = basket.advice ? adviseCategories(fleet, basket.advice.terrain, basket.advice.effort)[0] : undefined;
+  const advice = advised && advised.category === category ? { noun: CATEGORY_NOUN[advised.category], reason: advised.reasons[0] ?? "" } : null;
 
   // This rider's extras: what their bike takes, helmet first, nothing that belongs to the whole booking.
   const chosen = basket.riders.map((r) => (r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined)).filter((b) => b !== undefined);
@@ -113,6 +127,9 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     helmetOffered,
     helmetAnswered,
     showAll,
+    category,
+    chips,
+    advice,
     isLast,
     riders: basket.riders.map((r, i) => {
       const bike = r.bikeTypeId ? bikes.find((b) => b.id === r.bikeTypeId) : undefined;
@@ -184,6 +201,7 @@ export async function action({ context, request }: Route.ActionArgs) {
       const others = ridersOn(basket, bike.id) - (rider.bikeTypeId === bike.id ? 1 : 0);
       if (others < bike.free) {
         assignBike(rider, bike);
+        basket.preferredCategory = bike.category;
         next = { rider: r, step: "extras" };
       }
     }
@@ -245,11 +263,12 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function Riders({ loaderData }: Route.ComponentProps) {
-  const { tour, trip: t, days, current, step, ready, helmetOffered, helmetAnswered, showAll, isLast, riders, candidates, mine, forEveryone, copyFrom, after, extras, fees, bookingLines, seatLine, totalMinor, allDone } = loaderData;
+  const { tour, trip: t, days, current, step, ready, helmetOffered, helmetAnswered, showAll, category, chips, advice, isLast, riders, candidates, mine, forEveryone, copyFrom, after, extras, fees, bookingLines, seatLine, totalMinor, allDone } = loaderData;
   const trip = { startAt: new Date(t.startAt), endAt: new Date(t.endAt), riders: t.riders, explicit: t.explicit, tourDepartureId: t.tourDepartureId };
   const me = riders[current]!;
   const first = me.name || `rider ${current + 1}`;
-  const here = tripHref("/riders", trip, { r: current + 1, step, all: showAll ? 1 : undefined });
+  const cat = category ?? "all";
+  const here = tripHref("/riders", trip, { r: current + 1, step, all: showAll ? 1 : undefined, cat });
   const fits = candidates.filter((c) => c.free > 0);
   const helmet = mine.find((a) => a.id === HELMET);
   const rest = mine.filter((a) => a.id !== HELMET);
@@ -295,15 +314,49 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
               <div className="flex flex-col gap-[14px]">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h2 className="text-[19px] font-semibold tracking-[-.012em]">
-                    {me.heightCm && !showAll ? `Free for ${me.heightCm} cm on your dates` : "Free on your dates"}
-                    <span className="ml-2 text-[14px] font-normal text-ink-mute">{fits.length} bikes</span>
+                    {category ? `${CATEGORY_LABEL[category]}${category === "ebike" ? "" : " bikes"} free` : "Free"}
+                    {me.heightCm && !showAll ? ` for ${me.heightCm} cm on your dates` : " on your dates"}
+                    <span className="ml-2 text-[14px] font-normal text-ink-mute">{fits.length} {fits.length === 1 ? "bike" : "bikes"}</span>
                   </h2>
                   {me.heightCm && (
-                    <Link to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? undefined : 1 })} className="text-[14px] font-semibold text-brand-bright hover:text-ink">
+                    <Link to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? undefined : 1, cat })} className="text-[14px] font-semibold text-brand-bright hover:text-ink">
                       {showAll ? "Only my size" : "Show other sizes"}
                     </Link>
                   )}
                 </div>
+                {/* the type: one tap, and it sticks for the next rider */}
+                {ready && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {chips.map((c) => {
+                      const on = category === c.category;
+                      return (
+                        <Link
+                          key={c.category}
+                          to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? 1 : undefined, cat: on ? "all" : c.category })}
+                          preventScrollReset
+                          aria-pressed={on}
+                          className={cx("inline-flex items-center gap-2 rounded-full px-4 py-[9px] text-[14px] font-semibold transition-colors", on ? "bg-brand text-ink" : c.free > 0 ? "bg-white/8 text-ink hover:bg-white/14" : "bg-white/4 text-ink-dim")}
+                        >
+                          {c.label}
+                          <span className={cx("num text-[12.5px]", on ? "text-ink/80" : "text-ink-mute")}>{c.free}</span>
+                        </Link>
+                      );
+                    })}
+                    {category && (
+                      <Link to={tripHref("/riders", trip, { r: current + 1, step: "bike", all: showAll ? 1 : undefined, cat: "all" })} preventScrollReset className="px-2 text-[13.5px] font-semibold text-brand-bright hover:text-ink">
+                        All types
+                      </Link>
+                    )}
+                  </div>
+                )}
+                {ready && advice && (
+                  <span className="flex gap-[10px] text-[14px] leading-[1.5] text-ink-soft">
+                    <Star size={16} className="mt-[3px] shrink-0 text-brand-bright" />
+                    <span>
+                      We'd put {first} on {advice.noun}: {advice.reason.charAt(0).toLowerCase() + advice.reason.slice(1)}.
+                    </span>
+                  </span>
+                )}
                 {!ready && (
                   <Card className="flex flex-col gap-2 bg-brand/12 px-5 py-[18px]">
                     <span className="text-[15.5px] font-semibold">How tall is {first}? Then the bikes appear.</span>
@@ -360,7 +413,11 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                     );
                   })}
                 </div>}
-                {ready && candidates.length === 0 && <Card className="p-6 text-[15px] text-ink-soft">Nothing in the fleet fits {me.heightCm} cm on these dates. Try "Show other sizes" — we can often adjust a frame.</Card>}
+                {ready && candidates.length === 0 && (
+                  <Card className="p-6 text-[15px] text-ink-soft">
+                    {category ? `No ${CATEGORY_LABEL[category].toLowerCase()} fits ${me.heightCm} cm on these dates — tap another type above, or "Show other sizes"; we can often adjust a frame.` : `Nothing in the fleet fits ${me.heightCm} cm on these dates. Try "Show other sizes" — we can often adjust a frame.`}
+                  </Card>
+                )}
               </div>
             </>
           ) : (

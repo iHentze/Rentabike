@@ -152,7 +152,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </section>
         )}
 
-        {/* the fleet */}
+        {/* the fleet — a tile is the fast path: the type is set, the riders step opens on it */}
         <section className="flex flex-col gap-[14px]">
           <div className="flex items-baseline justify-between">
             <Lbl>The fleet · {fleetUnits} bikes</Lbl>
@@ -163,7 +163,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <Card className="p-2">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((c) => (
-                <Link key={c.category} to={tripHref("/bikes", trip, { cat: c.category })} className="flex items-center gap-[14px] rounded-field px-4 py-[15px] hover:bg-white/4">
+                <Link key={c.category} to={tripHref("/riders", trip, { cat: c.category })} className="flex items-center gap-[14px] rounded-field px-4 py-[15px] hover:bg-white/4">
                   <div className={cx("flex size-[46px] shrink-0 items-center justify-center rounded-full", c.category === "road" ? "bg-white/7 text-ink-soft" : "bg-brand/22 text-brand-bright")}>
                     {c.category === "ebike" && <Bolt size={22} />}
                     {c.category === "mountain" && <Mountain size={22} />}
