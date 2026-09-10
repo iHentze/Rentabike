@@ -12,10 +12,11 @@ export const PRINT_OVERLAY = {
   available: false,
   url: "/map/print-2025.jpg",
   corners: [
-    [-7.95, 62.52],
-    [-6.02, 62.52],
-    [-6.02, 61.32],
-    [-7.95, 61.32],
+    // Fitted from thirteen villages read off the print; good to a kilometre or two.
+    [-7.8999, 62.4181],
+    [-6.1826, 62.4121],
+    [-6.1394, 61.3721],
+    [-7.8567, 61.3781],
   ] as [LngLat, LngLat, LngLat, LngLat],
   opacity: 0.65,
 };
