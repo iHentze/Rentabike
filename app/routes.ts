@@ -31,6 +31,7 @@ export default [
     route("bookings/:id", "routes/admin/booking.tsx"),
     route("stock", "routes/admin/stock.tsx"),
     route("tours", "routes/admin/tours.tsx"),
+    route("fleet", "routes/admin/fleet.tsx"),
   ]),
   route("health", "routes/health.ts"),
   // Catalogue photos, fetched from the shop by the Worker and cached at the edge.
