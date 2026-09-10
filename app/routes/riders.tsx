@@ -434,7 +434,7 @@ export default function Riders({ loaderData }: Route.ComponentProps) {
                       <button name="value" value="no" className={cx("flex w-full items-center gap-[13px] rounded-[16px] px-[17px] py-[15px] text-left", helmet.qty === 0 && me.helmetDeclined ? "bg-white/8 shadow-[inset_0_0_0_2px_rgba(255,255,255,.35)]" : "bg-white/5 hover:bg-white/8")}>
                         <Radio on={helmet.qty === 0 && me.helmetDeclined} />
                         <span className="flex flex-col gap-[2px]">
-                          <span className="text-[15.5px] font-semibold">No — {first} brings {me.name ? "their" : "your"} own</span>
+                          <span className="text-[15.5px] font-semibold">No — {first} brings their own</span>
                           <span className="text-[13px] text-ink-mute">Fine. Bring it to the shop, we check the fit.</span>
                         </span>
                       </button>
