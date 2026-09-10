@@ -1,0 +1,41 @@
+# Refresh the cycling map's road data from OpenStreetMap and commit the
+# result to the branch the workflow runs on. Run it by hand from the Actions
+# tab (or `gh workflow run map-data.yml --ref <branch>`) after changing
+# scripts/map/classification.ts, or when OSM has moved on.
+name: Map data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Fetch OSM and rebuild public/map
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Fetch Overpass and rebuild
+        run: npm run map:build -- --fetch
+
+      - name: Places OSM knows (for authoring)
+        run: npm run map:list > scripts/map/cache/places.txt
+
+      - name: Commit the data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/map/cache public/map
+          git diff --cached --quiet && echo "nothing changed" && exit 0
+          git commit -m "Map data: rebuild from OpenStreetMap"
+          git push

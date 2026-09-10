@@ -11,7 +11,7 @@ import type { FeatureCollection, Point } from "geojson";
 export type LngLat = [number, number];
 
 /** The print map's road classes, in drawing order from thinnest to loudest. */
-export type RoadClass = "local" | "gravel" | "mtb" | "main" | "singleLane" | "classA";
+export type RoadClass = "local" | "gravel" | "mtb" | "main" | "classA";
 
 export interface RoadProps {
   id: string;
@@ -20,6 +20,8 @@ export interface RoadProps {
   ref?: string;
   /** Sóljuleið, the buttercup tourist route — a flag on top of the class. */
   buttercup?: boolean;
+  /** Single-lane road with lay-bys — drawn with tick marks on top of the class. */
+  singleLane?: boolean;
   osmId?: number;
 }
 
@@ -44,6 +46,10 @@ export interface PortalProps {
   /** Degrees clockwise from north, the direction the tunnel runs at this end. */
   bearing: number;
   open: boolean;
+  /** Copied from the tunnel so a click on a portal can name it. */
+  name: string;
+  letter?: TunnelLetter;
+  lengthKm?: number;
 }
 
 export interface FerryProps {
@@ -64,8 +70,8 @@ export interface TunnelInfo {
   /** One entry per paragraph. */
   cycling: string;
   bus?: string;
-  /** OSM way ids of the tunnel; joined by the build script. */
-  osmWayIds: number[];
+  /** Other spellings OSM may use; the build joins on the name. */
+  aliases?: string[];
   /** Where to fly when picked from the legend. */
   at: LngLat;
 }

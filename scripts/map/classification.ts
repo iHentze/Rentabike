@@ -1,0 +1,116 @@
+/**
+ * The print map's classification, written as routes between places. The
+ * build script resolves each place to its OpenStreetMap node, snaps it to
+ * the road network and takes the shortest road between consecutive places;
+ * "@lat,lon" pins a point where a name is ambiguous or absent.
+ *
+ * Read the map, not this file, when in doubt: the print is the source. The
+ * comments name the print's own words where a note explains a choice.
+ */
+import type { RoadClass } from "../../app/data/map/types";
+
+export interface RouteSpec {
+  id: string;
+  /** Place names as OSM spells them, or "@lat,lon". */
+  via: string[];
+  /** Roads open for the Sóljuleið buttercup route. */
+  buttercup?: boolean;
+  /** Single-lane road with lay-bys. */
+  singleLane?: boolean;
+  /** Let the route take a tunnel without the usual penalty. */
+  allowTunnel?: boolean;
+}
+
+/** Class A — "scenic and bike-friendly", the thick yellow lines. */
+export const CLASS_A: RouteSpec[] = [
+  // Vágar
+  { id: "gasadalur", via: ["Gásadalur", "Bøur", "Sørvágur"], buttercup: true, allowTunnel: true },
+  { id: "vagar-south", via: ["Sørvágur", "Miðvágur", "Sandavágur", "Vatnsoyrar"] },
+  // Streymoy
+  { id: "kirkjubour-loop", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9650,-6.7750", "Tórshavn"], buttercup: true },
+  { id: "nordradalur", via: ["@62.0180,-6.8200", "Norðradalur"], singleLane: true },
+  { id: "kaldbak", via: ["Hvítanes", "Sund", "Kaldbaksbotnur", "Kaldbak"] },
+  { id: "kollafjordur-old", via: ["Kaldbaksbotnur", "Kollafjørður"] },
+  { id: "leynar-vestmanna", via: ["Leynar", "Skælingur", "Kvívík", "Vestmanna"] },
+  { id: "saksun", via: ["Hvalvík", "Streymnes", "Saksun"], singleLane: true },
+  { id: "tjornuvik", via: ["Hvalvík", "Langasandur", "Haldórsvík", "Tjørnuvík"], buttercup: true },
+  { id: "hosvik", via: ["Kollafjørður", "Hósvík", "Hvalvík"] },
+  // Eysturoy
+  { id: "eidi", via: ["Oyrarbakki", "Oyri", "Norðskáli", "Svínáir", "Ljósá", "Eiði"], buttercup: true },
+  { id: "gjogv", via: ["Eiði", "Gjógv"], buttercup: true },
+  { id: "funningur", via: ["Gjógv", "Funningur", "Funningsfjørður"], buttercup: true },
+  { id: "elduvik", via: ["Funningsfjørður", "Elduvík"] },
+  { id: "oyndarfjordur", via: ["Funningsfjørður", "Oyndarfjørður"] },
+  { id: "skalafjordur-west", via: ["Skálabotnur", "Skáli", "Strendur", "Selatrað"] },
+  { id: "skalafjordur-east", via: ["Skálabotnur", "Søldarfjørður", "Glyvrar", "Runavík", "Toftir"] },
+  { id: "aeduvik", via: ["Runavík", "Rituvík", "Æðuvík"], buttercup: true },
+  { id: "toftir-nes", via: ["Toftir", "Nes"] },
+  { id: "fuglafjordur", via: ["Leirvík", "Fuglafjørður"] },
+  // Norðoyar
+  { id: "vidareidi", via: ["Klaksvík", "Árnafjørður", "Hvannasund", "Viðareiði"], buttercup: true, allowTunnel: true },
+  { id: "kunoy", via: ["Klaksvík", "Haraldssund", "Kunoy"], allowTunnel: true },
+  { id: "kalsoy", via: ["Syðradalur", "Húsar", "Mikladalur", "Trøllanes"], singleLane: true, allowTunnel: true },
+  { id: "fugloy", via: ["Kirkja", "Hattarvík"] },
+  // Sandoy
+  { id: "sandoy", via: ["Skopun", "Sandur", "Skálavík", "Húsavík", "Dalur"], buttercup: true },
+  { id: "skarvanes", via: ["Sandur", "Skarvanes"] },
+  // Suðuroy
+  { id: "hvalba", via: ["Sandvík", "Hvalba", "Trongisvágur", "Tvøroyri"], allowTunnel: true },
+  { id: "famjin", via: ["Trongisvágur", "Fámjin"], buttercup: true },
+  { id: "hov-vagur", via: ["Tvøroyri", "Øravík", "Hov", "Porkeri", "Vágur"], buttercup: true },
+  { id: "sumba", via: ["Vágur", "Lopra", "Sumba", "Akrar"], allowTunnel: true },
+];
+
+/** Roads the print draws as "other main road" though OSM would rank them lower, or the reverse. */
+export const MAIN: RouteSpec[] = [];
+
+/** "Local or semi-public road with bike access" — the white lines the print picks out. */
+export const LOCAL: RouteSpec[] = [
+  // "SEV hydro station service roads: wild, steep, tranquil"
+  { id: "sev", via: ["Vestmanna", "@62.1350,-7.1250"] },
+];
+
+/** Where the print marks the road as gravel or an MTB track. */
+export const GRAVEL: RouteSpec[] = [];
+export const MTB: RouteSpec[] = [];
+
+/** Tunnels closed to cyclists (dashed on the print). Every other tunnel drawn is open, with care. */
+export const TUNNELS_CLOSED = ["Eysturoyartunnilin", "Sandoyartunnilin"];
+
+/** Ferries that do not take bikes. */
+export const FERRIES_NO_BIKES = ["Mykines"];
+
+/** What a road is when no route claims it. `null` leaves it off the map. */
+export const HIGHWAY_DEFAULT: Record<string, RoadClass | null> = {
+  trunk: "main",
+  trunk_link: "main",
+  primary: "main",
+  primary_link: "main",
+  secondary: "main",
+  secondary_link: "main",
+  tertiary: "local",
+  tertiary_link: "local",
+  unclassified: "local",
+  residential: null,
+  living_street: null,
+  service: null,
+  track: null,
+  cycleway: null,
+  path: null,
+};
+
+/** The named loops, as closed routes. Names and colours live in app/data/map/loops.ts. */
+export const LOOP_ROUTES: RouteSpec[] = [
+  { id: "northern-eysturoy", via: ["Oyrarbakki", "Eiði", "Gjógv", "Funningur", "Funningsfjørður", "Skálabotnur", "Oyrarbakki"] },
+  { id: "great-central", via: ["Tórshavn", "Kaldbak", "Kollafjørður", "Hósvík", "Hvalvík", "Oyrarbakki", "Skálabotnur", "Skáli", "Strendur"] },
+  { id: "kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9650,-6.7750", "Tórshavn"] },
+  { id: "sornfelli", via: ["Tórshavn", "@62.0180,-6.8200", "@62.0600,-6.9700"] },
+];
+
+/** Our guided tours on the map. Slugs match scripts/seed-tours.ts. */
+export const TOUR_ROUTES: RouteSpec[] = [
+  { id: "historical-kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9650,-6.7750", "Tórshavn"] },
+  { id: "viewpoint-nordadalsskard", via: ["Tórshavn", "@62.0180,-6.8200", "Norðradalur"] },
+  { id: "westward-journey", via: ["Tórshavn", "@62.0180,-6.8200", "@62.0600,-6.9700"] },
+  { id: "clifftop-bliss-sandoy", via: ["Skopun", "Sandur", "Skálavík"] },
+];
