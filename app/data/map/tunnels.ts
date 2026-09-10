@@ -59,6 +59,7 @@ export const TUNNELS: TunnelInfo[] = [
   {
     letter: "F",
     name: "Kollafjarðartunnilin",
+    aliases: ["Kollfjarðartunnilin"],
     lengthKm: 2.8,
     profile: "Profile S–N +49 to +74 m",
     status: "open",

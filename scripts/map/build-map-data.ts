@@ -37,7 +37,8 @@ async function main() {
   const ferriesRaw = await overpass("ferries", QUERIES.ferries, fetchFresh);
   const roadsRaw = await overpass("roads", QUERIES.roads, fetchFresh);
   const ways = roadsRaw.filter((e): e is OsmWay => e.type === "way");
-  const places = placesRaw.filter((e): e is OsmNode => e.type === "node");
+  const places = placesRaw.filter((e): e is OsmNode => e.type === "node" && Number.isFinite(e.lat) && Number.isFinite(e.lon));
+  if (places.length === 0) throw new Error("the places cache has no coordinates — refetch with --fetch");
 
   if (args.has("--list")) return list(places);
 
@@ -201,6 +202,7 @@ async function main() {
   console.log(`roads: ${roads.length} segments — classA ${count("classA")}, main ${count("main")}, local ${count("local")}, gravel ${count("gravel")}, mtb ${count("mtb")}; buttercup ${roads.filter((r) => r.properties.buttercup).length}, single-lane ${roads.filter((r) => r.properties.singleLane).length}`);
   console.log(`tunnels: ${tunnels.filter((t) => t.properties.kind === "tunnel").length}, ferries: ${ferries.length}, loops: ${loops.length}, tours: ${tours.length}`);
   for (const w of warnings) console.warn(`! ${w}`);
+  console.log(`${warnings.length} warning(s)`);
   if (roads.length === 0) {
     console.error("no roads — refusing to write an empty map");
     process.exit(1);

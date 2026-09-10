@@ -80,5 +80,5 @@ out geom;`,
   node["natural"~"^(peak|cape|bay|strait|beach)$"]["name"](${BBOX});
   node["mountain_pass"="yes"](${BBOX});
 );
-out tags;`,
+out;`,
 };
