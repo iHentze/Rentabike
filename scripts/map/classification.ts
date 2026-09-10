@@ -135,6 +135,6 @@ export const LOOP_ROUTES: RouteSpec[] = [
 export const TOUR_ROUTES: RouteSpec[] = [
   { id: "historical-kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9624,-6.8189", "Velbastaður", "Tórshavn"] },
   { id: "viewpoint-nordadalsskard", via: ["Tórshavn", "@62.0180,-6.8200", "Norðradalur"] },
-  { id: "westward-journey", via: ["Tórshavn", "@62.0180,-6.8200", "@62.0600,-6.9700"] },
+  { id: "westward-journey", via: ["@62.0640,-6.9640", "@62.0330,-6.8900", "Norðradalur"] },
   { id: "clifftop-bliss-sandoy", via: ["Skopun", "Sandur", "Skálavík"] },
 ];

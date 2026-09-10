@@ -26,8 +26,8 @@ export function Sheet({ open, side, title, onClose, children, className }: { ope
         "absolute z-20 flex flex-col overflow-hidden bg-card/95 text-ink shadow-[0_12px_40px_rgba(0,0,0,.35)] backdrop-blur",
         // phone: a sheet along the bottom
         "inset-x-0 bottom-0 max-h-[62dvh] rounded-t-card",
-        // wide: a card at one side
-        "lg:inset-x-auto lg:bottom-4 lg:top-4 lg:max-h-none lg:w-[360px] lg:rounded-card",
+        // wide: a card at one side, as tall as its content
+        "lg:inset-x-auto lg:bottom-auto lg:top-4 lg:max-h-[calc(100%-2rem)] lg:w-[360px] lg:rounded-card",
         side === "left" ? "lg:left-4" : "lg:right-4",
         className,
       )}

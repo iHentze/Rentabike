@@ -79,6 +79,18 @@ for (const width of [390, 320]) {
   const tour = await page.locator('a[href^="/tours/"]').first().getAttribute("href");
   if (tour) await go(tour, "/tours/:slug");
   await go("/tours/viewpoint-nordadalsskard?riders=2", "/tours/:slug riders=2");
+  // The map keeps fetching tiles, so "networkidle" never comes: wait for the page instead.
+  const goMap = async (path, name) => {
+    await page.goto(`${base}${path}`, { waitUntil: "load" });
+    await page.waitForTimeout(2500);
+    await report(name);
+  };
+  await goMap("/map", "/map");
+  await page.getByRole("button", { name: /Legend/ }).click().catch(() => {});
+  await page.waitForTimeout(300);
+  await report("/map legend open");
+  await goMap("/map?f=tunnel:E", "/map tunnel panel");
+  await goMap("/map?tour=historical-kirkjubour", "/map tour card");
 
   // the funnel with two riders, the second bike being the longest name in stock
   await go(`/riders?${Q}`, "/riders bike step");

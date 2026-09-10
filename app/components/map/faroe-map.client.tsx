@@ -116,7 +116,7 @@ export default function FaroeMap({ content, scenicNames, visible, selected, flyT
     });
     map.touchZoomRotate.disableRotation();
     map.keyboard.disableRotation();
-    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new ScaleControl({ unit: "metric" }), "bottom-right");
     map.addControl(new AttributionControl({ compact: true, customAttribution: CREDIT }), "bottom-right");
     map.getCanvas().setAttribute("aria-label", "Cycling map of the Faroe Islands");

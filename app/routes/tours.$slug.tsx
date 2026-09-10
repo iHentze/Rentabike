@@ -1,5 +1,6 @@
 import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/tours.$slug";
+import { TOUR_LINKS } from "~/data/map/tours";
 import { cloudflareContext } from "~/context";
 import { Footer, Header, SHOP, Shell } from "~/components/site";
 import { Card, Lbl, Tag, cx } from "~/components/ui";
@@ -110,6 +111,11 @@ export default function TourDetail({ loaderData }: Route.ComponentProps) {
                   </span>
                 ))}
               </div>
+            )}
+            {TOUR_LINKS.some((t) => t.slug === tour.slug) && (
+              <Link to={`/map?tour=${tour.slug}`} className="inline-flex items-center gap-[6px] self-start pt-1 text-[15px] font-semibold text-brand-bright hover:text-ink">
+                See the route on the cycling map ›
+              </Link>
             )}
           </div>
 
