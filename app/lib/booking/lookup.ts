@@ -1,6 +1,7 @@
 /** Read one booking back for the confirmation and "my booking" pages. */
 
 export interface BookingLineView {
+  id: string;
   kind: "bike" | "addon" | "fee" | "tour_seat";
   label: string;
   riderLabel: string | null;
@@ -60,7 +61,7 @@ async function hydrate(d1: D1Database, b: Record<string, unknown> | null): Promi
   if (!b) return null;
   const lines = await d1
     .prepare(
-      `SELECT bl.kind, bl.label, bl.rider_label, bl.qty, bl.unit_price_minor, bl.line_total_minor, bl.bike_type_id, bt.size_label, bl.tour_departure_id
+      `SELECT bl.id, bl.kind, bl.label, bl.rider_label, bl.qty, bl.unit_price_minor, bl.line_total_minor, bl.bike_type_id, bt.size_label, bl.tour_departure_id
          FROM booking_lines bl LEFT JOIN bike_types bt ON bt.id = bl.bike_type_id
         WHERE bl.booking_id = ?1
         ORDER BY CASE bl.kind WHEN 'tour_seat' THEN 0 WHEN 'bike' THEN 1 WHEN 'addon' THEN 2 ELSE 3 END, bl.rider_label, bl.label`,
@@ -91,6 +92,7 @@ async function hydrate(d1: D1Database, b: Record<string, unknown> | null): Promi
     holdExpiresAt: (b.hold_expires_at as number | null) ?? null,
     createdAt: b.created_at as number,
     lines: (lines.results ?? []).map((l) => ({
+      id: l.id as string,
       kind: l.kind as BookingLineView["kind"],
       label: l.label as string,
       riderLabel: (l.rider_label as string | null) ?? null,
