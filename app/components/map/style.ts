@@ -343,14 +343,14 @@ export function buildStyle(content: MapContent, scenicNames: string[]): StyleSpe
       type: "line",
       source: "loops",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ex(["get", "color"]), "line-width": grow(9, 24), "line-opacity": 0.3, "line-blur": 1.5 },
+      paint: { "line-color": ex(["get", "color"]), "line-width": grow(3.5, 22), "line-opacity": 0.28, "line-blur": 1 },
     },
     {
       id: "loops-selected",
       type: "line",
       source: "loops",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ex(["get", "color"]), "line-width": grow(9, 24), "line-opacity": ex(["*", 0.35, selectedWidth]) },
+      paint: { "line-color": ex(["get", "color"]), "line-width": grow(3.5, 22), "line-opacity": ex(["*", 0.35, selectedWidth]) },
     },
     {
       id: "loop-label",
@@ -373,7 +373,7 @@ export function buildStyle(content: MapContent, scenicNames: string[]): StyleSpe
       type: "line",
       source: "tours",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": PAPER.brand, "line-width": grow(8, 20), "line-opacity": 0.28, "line-blur": 1.5 },
+      paint: { "line-color": PAPER.brand, "line-width": grow(3, 18), "line-opacity": 0.25, "line-blur": 1 },
     },
     {
       id: "tour-line",
@@ -387,7 +387,7 @@ export function buildStyle(content: MapContent, scenicNames: string[]): StyleSpe
       type: "line",
       source: "tours",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": PAPER.brand, "line-width": grow(8, 20), "line-opacity": ex(["*", 0.4, selectedWidth]) },
+      paint: { "line-color": PAPER.brand, "line-width": grow(3, 18), "line-opacity": ex(["*", 0.4, selectedWidth]) },
     },
 
     // --- points ----------------------------------------------------------

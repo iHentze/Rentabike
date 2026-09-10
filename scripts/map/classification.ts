@@ -27,7 +27,7 @@ export const CLASS_A: RouteSpec[] = [
   { id: "gasadalur", via: ["Gásadalur", "Bøur", "Sørvágur"], buttercup: true, allowTunnel: true },
   { id: "vagar-south", via: ["Sørvágur", "Miðvágur", "Sandavágur", "Vatnsoyrar"] },
   // Streymoy
-  { id: "kirkjubour-loop", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9650,-6.7750", "Tórshavn"], buttercup: true },
+  { id: "kirkjubour-loop", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9624,-6.8189", "Velbastaður", "Tórshavn"], buttercup: true },
   { id: "nordradalur", via: ["@62.0180,-6.8200", "Norðradalur"], singleLane: true },
   { id: "kaldbak", via: ["Hvítanes", "Sund", "Kaldbaksbotnur", "Kaldbak"] },
   { id: "kollafjordur-old", via: ["Kaldbaksbotnur", "Kollafjørður"] },
@@ -41,15 +41,15 @@ export const CLASS_A: RouteSpec[] = [
   { id: "funningur", via: ["Gjógv", "Funningur", "Funningsfjørður"], buttercup: true },
   { id: "elduvik", via: ["Funningsfjørður", "Elduvík"] },
   { id: "oyndarfjordur", via: ["Funningsfjørður", "Oyndarfjørður"] },
-  { id: "skalafjordur-west", via: ["Skálabotnur", "Skáli", "Strendur", "Selatrað"] },
-  { id: "skalafjordur-east", via: ["Skálabotnur", "Søldarfjørður", "Glyvrar", "Runavík", "Toftir"] },
+  { id: "skalafjordur-west", via: ["Skálafjørður", "Skála", "Strendur", "Selatrað"] },
+  { id: "skalafjordur-east", via: ["Skálafjørður", "Søldarfjørður", "Glyvrar", "Runavík", "Toftir"] },
   { id: "aeduvik", via: ["Runavík", "Rituvík", "Æðuvík"], buttercup: true },
-  { id: "toftir-nes", via: ["Toftir", "Nes"] },
+  { id: "toftir-nes", via: ["Toftir", "@62.0778,-6.7195"] },
   { id: "fuglafjordur", via: ["Leirvík", "Fuglafjørður"] },
   // Norðoyar
   { id: "vidareidi", via: ["Klaksvík", "Árnafjørður", "Hvannasund", "Viðareiði"], buttercup: true, allowTunnel: true },
   { id: "kunoy", via: ["Klaksvík", "Haraldssund", "Kunoy"], allowTunnel: true },
-  { id: "kalsoy", via: ["Syðradalur", "Húsar", "Mikladalur", "Trøllanes"], singleLane: true, allowTunnel: true },
+  { id: "kalsoy", via: ["@62.2453,-6.6678", "Húsar", "Mikladalur", "Trøllanes"], singleLane: true, allowTunnel: true },
   { id: "fugloy", via: ["Kirkja", "Hattarvík"] },
   // Sandoy
   { id: "sandoy", via: ["Skopun", "Sandur", "Skálavík", "Húsavík", "Dalur"], buttercup: true },
@@ -57,7 +57,7 @@ export const CLASS_A: RouteSpec[] = [
   // Suðuroy
   { id: "hvalba", via: ["Sandvík", "Hvalba", "Trongisvágur", "Tvøroyri"], allowTunnel: true },
   { id: "famjin", via: ["Trongisvágur", "Fámjin"], buttercup: true },
-  { id: "hov-vagur", via: ["Tvøroyri", "Øravík", "Hov", "Porkeri", "Vágur"], buttercup: true },
+  { id: "hov-vagur", via: ["Tvøroyri", "Ørðavík", "Hov", "Porkeri", "Vágur"], buttercup: true },
   { id: "sumba", via: ["Vágur", "Lopra", "Sumba", "Akrar"], allowTunnel: true },
 ];
 
@@ -74,8 +74,32 @@ export const LOCAL: RouteSpec[] = [
 export const GRAVEL: RouteSpec[] = [];
 export const MTB: RouteSpec[] = [];
 
-/** Tunnels closed to cyclists (dashed on the print). Every other tunnel drawn is open, with care. */
-export const TUNNELS_CLOSED = ["Eysturoyartunnilin", "Sandoyartunnilin"];
+/**
+ * Tunnels closed to cyclists (dashed on the print). Every other tunnel drawn
+ * is open, with care. The old Hvalba tunnel is "fenced off for all traffic".
+ */
+export const TUNNELS_CLOSED = ["Eysturoyartunnilin", "Sandoyartunnilin", "Hvalbiartunnilin"];
+
+/** Tunnels the print draws as open (solid). Listed so the build only warns about tunnels new to us. */
+export const TUNNELS_KNOWN_OPEN = [
+  "Hovs Tunnilin",
+  "Sandvíkartunnilin",
+  "Leynartunnilin",
+  "Leirvíkartunnilin",
+  "Hvannasundstunnilin",
+  "Árnafjarðartunnilin",
+  "Gásadalstunnilin",
+  "Kunoyartunnilin",
+  "Sumbiartunnilin",
+  "Viðareiðistunnilin",
+  "Nýggjur Hvalbiartunnilin",
+  "Húsareynstunnilin",
+  "Dalstunnilin",
+  "Fámjinstunnilin",
+];
+
+/** Anything shorter is an underpass or a building passage, not a tunnel the print draws. */
+export const TUNNEL_MIN_M = 120;
 
 /** Ferries that do not take bikes. */
 export const FERRIES_NO_BIKES = ["Mykines"];
@@ -101,15 +125,15 @@ export const HIGHWAY_DEFAULT: Record<string, RoadClass | null> = {
 
 /** The named loops, as closed routes. Names and colours live in app/data/map/loops.ts. */
 export const LOOP_ROUTES: RouteSpec[] = [
-  { id: "northern-eysturoy", via: ["Oyrarbakki", "Eiði", "Gjógv", "Funningur", "Funningsfjørður", "Skálabotnur", "Oyrarbakki"] },
-  { id: "great-central", via: ["Tórshavn", "Kaldbak", "Kollafjørður", "Hósvík", "Hvalvík", "Oyrarbakki", "Skálabotnur", "Skáli", "Strendur"] },
-  { id: "kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9650,-6.7750", "Tórshavn"] },
+  { id: "northern-eysturoy", via: ["Oyrarbakki", "Eiði", "Gjógv", "Funningur", "Funningsfjørður", "Skálafjørður", "Oyrarbakki"] },
+  { id: "great-central", via: ["Tórshavn", "Kaldbak", "Kollafjørður", "Hósvík", "Hvalvík", "Oyrarbakki", "Skálafjørður", "Skála", "Strendur"] },
+  { id: "kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9624,-6.8189", "Velbastaður", "Tórshavn"] },
   { id: "sornfelli", via: ["Tórshavn", "@62.0180,-6.8200", "@62.0600,-6.9700"] },
 ];
 
 /** Our guided tours on the map. Slugs match scripts/seed-tours.ts. */
 export const TOUR_ROUTES: RouteSpec[] = [
-  { id: "historical-kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9650,-6.7750", "Tórshavn"] },
+  { id: "historical-kirkjubour", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9624,-6.8189", "Velbastaður", "Tórshavn"] },
   { id: "viewpoint-nordadalsskard", via: ["Tórshavn", "@62.0180,-6.8200", "Norðradalur"] },
   { id: "westward-journey", via: ["Tórshavn", "@62.0180,-6.8200", "@62.0600,-6.9700"] },
   { id: "clifftop-bliss-sandoy", via: ["Skopun", "Sandur", "Skálavík"] },

@@ -122,17 +122,15 @@ export default function FaroeMap({ content, scenicNames, visible, selected, flyT
     map.getCanvas().setAttribute("aria-label", "Cycling map of the Faroe Islands");
 
     // Icons are rasterised on demand from the SVG strings — no sprite sheet.
-    const pending = new Set<string>();
-    map.on("styleimagemissing", (e) => {
-      const id = e.id as IconId;
-      if (!(id in ICONS) || pending.has(id) || map.hasImage(id)) return;
-      pending.add(id);
+    map.setMissingStyleImageResolver(async (id) => {
+      if (!(id in ICONS) || map.hasImage(id)) return;
       const img = new Image(96, 96);
-      img.onload = () => {
-        if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 });
-        pending.delete(id);
-      };
-      img.src = `data:image/svg+xml;utf8,${encodeURIComponent(ICONS[id])}`;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error(`icon ${id}`));
+        img.src = `data:image/svg+xml;utf8,${encodeURIComponent(ICONS[id as IconId])}`;
+      });
+      if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 });
     });
 
     const canvas = map.getCanvas();
@@ -145,7 +143,16 @@ export default function FaroeMap({ content, scenicNames, visible, selected, flyT
       onSelectRef.current(hit ? selectionFrom(hit) : null);
     });
 
-    map.once("load", () => {
+    // A GeoJSON source arriving after the first render drops any feature
+    // state set before it; put the selection back when the source is in.
+    map.on("sourcedata", (e) => {
+      const sel = selectedRef.current;
+      if (e.isSourceLoaded && sel && stateKey(sel).source === e.sourceId) applySelection(map, null, sel);
+    });
+
+    // "style.load" — the layers exist — rather than "load", which also waits
+    // for every tile source and never comes if a tile host is unreachable.
+    map.once("style.load", () => {
       readyRef.current = true;
       applyVisibility(map, visible);
       applySelection(map, selectedRef.current, selected);

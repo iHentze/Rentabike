@@ -4,6 +4,7 @@
  * a change in OSM is a diff we can read.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,10 +29,9 @@ export type OsmElement = OsmNode | OsmWay;
 
 export async function overpass(key: string, query: string, fetchFresh: boolean): Promise<OsmElement[]> {
   mkdirSync(CACHE_DIR, { recursive: true });
-  const file = join(CACHE_DIR, `${key}.json`);
-  if (!fetchFresh && existsSync(file)) {
-    return (JSON.parse(readFileSync(file, "utf8")) as { elements: OsmElement[] }).elements;
-  }
+  const file = join(CACHE_DIR, `${key}.json.gz`);
+  const read = () => (JSON.parse(gunzipSync(readFileSync(file)).toString("utf8")) as { elements: OsmElement[] }).elements;
+  if (!fetchFresh && existsSync(file)) return read();
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     for (const url of ENDPOINTS) {
@@ -44,7 +44,7 @@ export async function overpass(key: string, query: string, fetchFresh: boolean):
         if (res.status === 429 || res.status === 504) throw new Error(`${url} → ${res.status}, busy`);
         if (!res.ok) throw new Error(`${url} → ${res.status}`);
         const json = (await res.json()) as { elements: OsmElement[] };
-        writeFileSync(file, JSON.stringify({ fetched: new Date().toISOString(), query, elements: json.elements }));
+        writeFileSync(file, gzipSync(JSON.stringify({ fetched: new Date().toISOString(), query, elements: json.elements })));
         console.log(`${key}: ${json.elements.length} elements from ${url}`);
         return json.elements;
       } catch (e) {
@@ -57,7 +57,7 @@ export async function overpass(key: string, query: string, fetchFresh: boolean):
   }
   if (existsSync(file)) {
     console.warn(`${key}: every endpoint failed, using the cached copy`);
-    return (JSON.parse(readFileSync(file, "utf8")) as { elements: OsmElement[] }).elements;
+    return read();
   }
   throw lastError;
 }

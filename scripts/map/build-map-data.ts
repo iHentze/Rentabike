@@ -17,7 +17,7 @@ import type { Feature, FeatureCollection, LineString, MultiLineString, Point } f
 import { LOOPS } from "../../app/data/map/loops";
 import { TUNNELS } from "../../app/data/map/tunnels";
 import type { FerryProps, PortalProps, RoadClass, RoadProps, TunnelProps } from "../../app/data/map/types";
-import { CLASS_A, FERRIES_NO_BIKES, GRAVEL, HIGHWAY_DEFAULT, LOCAL, LOOP_ROUTES, MAIN, MTB, TOUR_ROUTES, TUNNELS_CLOSED, type RouteSpec } from "./classification";
+import { CLASS_A, FERRIES_NO_BIKES, GRAVEL, HIGHWAY_DEFAULT, LOCAL, LOOP_ROUTES, MAIN, MTB, TOUR_ROUTES, TUNNELS_CLOSED, TUNNELS_KNOWN_OPEN, TUNNEL_MIN_M, type RouteSpec } from "./classification";
 import { RoadGraph, distanceM, type Segment } from "./graph";
 import { QUERIES, overpass, type OsmNode, type OsmWay } from "./overpass";
 import { round5, simplify, type Coord } from "./simplify";
@@ -57,8 +57,8 @@ async function main() {
       return;
     }
     for (let i = 1; i < pins.length; i++) {
-      const a = graph.nearestNode(pins[i - 1]!);
-      const b = graph.nearestNode(pins[i]!);
+      const a = graph.nearestNode(pins[i - 1]!, isRoad);
+      const b = graph.nearestNode(pins[i]!, isRoad);
       if (!a || !b) continue;
       if (a.distM > SNAP_MAX_M || b.distM > SNAP_MAX_M) warnings.push(`route ${spec.id}: leg ${i} snapped ${Math.round(Math.max(a.distM, b.distM))} m from the road`);
       const path = graph.shortestPath(a.node, b.node, (s) => cost(s, spec));
@@ -110,13 +110,22 @@ async function main() {
   // Tunnels sharing a letter (the Kalsoy ones, D) become one feature.
   const tunnelGroups = new Map<string, { info: (typeof TUNNELS)[number] | undefined; name: string; segs: Segment[]; parts: Segment[][] }>();
   for (const [name, segs] of tunnelSegs) {
+    const totalM = segs.reduce((m, s) => m + s.lengthM, 0);
+    if (totalM < TUNNEL_MIN_M) {
+      // An underpass: keep it as road so the route stays joined.
+      for (const s of segs) {
+        const c = cls.get(s.id) ?? HIGHWAY_DEFAULT[s.tags.highway ?? ""] ?? null;
+        if (c) roads.push({ type: "Feature", id: s.id, geometry: { type: "LineString", coordinates: simplify(s.coords, TOLERANCE).map(round5) }, properties: { id: s.id, cls: c, osmId: s.wayId } });
+      }
+      continue;
+    }
     const info = TUNNELS.find((t) => t.name === name || t.aliases?.includes(name));
     const key = info ? info.letter : name;
     const g = tunnelGroups.get(key) ?? { info, name: info?.name ?? (name.startsWith("way-") ? "Tunnel" : name), segs: [], parts: [] };
     g.segs.push(...segs);
     g.parts.push(segs);
     tunnelGroups.set(key, g);
-    if (!info && !TUNNELS_CLOSED.includes(name)) warnings.push(`tunnel "${name}" (${Math.round(segs.reduce((m, s) => m + s.lengthM, 0) / 100) / 10} km) is not in the A–G list and not in TUNNELS_CLOSED — drawn as open`);
+    if (!info && !TUNNELS_CLOSED.includes(name) && !TUNNELS_KNOWN_OPEN.includes(name)) warnings.push(`tunnel "${name}" (${Math.round(segs.reduce((m, s) => m + s.lengthM, 0) / 100) / 10} km) is not in the A–G list and not in TUNNELS_CLOSED — drawn as open`);
   }
   const tunnels: Feature<MultiLineString | Point, TunnelProps | PortalProps>[] = [];
   for (const [key, g] of tunnelGroups) {
@@ -145,8 +154,10 @@ async function main() {
   for (const t of TUNNELS) if (!tunnelGroups.has(t.letter)) warnings.push(`tunnel ${t.letter} ${t.name}: no OSM tunnel of that name`);
 
   // 3. Ferries.
+  // Only the domestic ferries; Smyril Line's routes to Denmark and Iceland leave the map.
+  const onMap = (g: { lat: number; lon: number }) => g.lat > 61.3 && g.lat < 62.5 && g.lon > -7.8 && g.lon < -6.1;
   const ferries: Feature<LineString, FerryProps>[] = ferriesRaw
-    .filter((e): e is OsmWay => e.type === "way" && !!e.geometry)
+    .filter((e): e is OsmWay => e.type === "way" && !!e.geometry && e.geometry.every(onMap))
     .map((w) => {
       const name = w.tags?.name ?? [w.tags?.from, w.tags?.to].filter(Boolean).join(" – ") ?? `Ferry ${w.id}`;
       const text = `${name} ${w.tags?.from ?? ""} ${w.tags?.to ?? ""}`;
@@ -208,6 +219,9 @@ async function main() {
     process.exit(1);
   }
 }
+
+/** A village snaps to a road, never to a footpath or a driveway that may be an island of its own. */
+const isRoad = (s: Segment) => ["trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified", "residential"].includes(s.tags.highway ?? "");
 
 /** Tunnels and minor tracks only when nothing else leads there. */
 function cost(s: Segment, spec: RouteSpec): number {
