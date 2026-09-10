@@ -248,3 +248,16 @@ export async function stockList(d1: D1Database, at = Date.now()): Promise<StockR
     outToday: (r.out_today as number) ?? 0,
   }));
 }
+
+/** Everyone booked on one departure, live bookings first: who is coming on Saturday's ride. */
+export async function bookingsOnDeparture(d1: D1Database, departureId: string): Promise<BookingRow[]> {
+  const rows = await d1
+    .prepare(
+      `${ROW}
+        WHERE b.id IN (SELECT bl.booking_id FROM booking_lines bl WHERE bl.kind = 'tour_seat' AND bl.tour_departure_id = ?1)
+        ORDER BY CASE WHEN b.status IN ('held','confirmed','picked_up') THEN 0 ELSE 1 END, b.created_at`,
+    )
+    .bind(departureId)
+    .all<Record<string, unknown>>();
+  return (rows.results ?? []).map(toRow);
+}
