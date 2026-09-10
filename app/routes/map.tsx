@@ -12,11 +12,15 @@ import { cloudflareContext } from "~/context";
 import { FeaturePanel } from "~/components/map/feature-panel";
 import { defaultVisibility } from "~/components/map/legend-config";
 import { MapLegend } from "~/components/map/map-legend";
+import { PlannerPanel, planPointLabel } from "~/components/map/planner-panel";
+import { searchIndex, type SearchHit } from "~/components/map/search";
 import { useHydrated, useReducedMotion } from "~/components/map/use-hydrated";
+import { usePlanner, type PlanPoint } from "~/components/map/use-planner";
 import { Header } from "~/components/site";
-import { PillButton } from "~/components/ui";
+import { PillButton, cx } from "~/components/ui";
 import { LOOPS, NOTES, POIS, TOUR_LINKS, TUNNELS, mapContent, scenicVillageNames, tourSlugsOnMap } from "~/data/map";
-import type { FlyTarget, LayerGroupId, MapSelection, MapTour, TunnelInfo } from "~/data/map/types";
+import { VILLAGES } from "~/data/map/villages";
+import type { FlyTarget, LayerGroupId, LngLat, MapSelection, MapTour, PlannedRoute, TunnelInfo } from "~/data/map/types";
 import { listTours } from "~/lib/tours/catalogue";
 
 const FaroeMap = lazy(() => import("~/components/map/faroe-map.client"));
@@ -87,6 +91,17 @@ function fromSearch(params: URLSearchParams): { selection: MapSelection; fly: Fl
   return null;
 }
 
+/** `?from=lon,lat&to=lon,lat` — a planned ride, shareable. */
+function pointParam(v: string | null): PlanPoint | undefined {
+  if (!v) return undefined;
+  const [lon, lat] = v.split(",").map(Number);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return undefined;
+  const at: LngLat = [lon!, lat!];
+  const near = VILLAGES.find((x) => Math.abs(x.at[0] - at[0]) < 0.0006 && Math.abs(x.at[1] - at[1]) < 0.0006);
+  return { at, label: near?.name ?? planPointLabel(at) };
+}
+const pointStr = (p: PlanPoint) => `${p.at[0].toFixed(5)},${p.at[1].toFixed(5)}`;
+
 function toSearch(sel: MapSelection | null): Record<string, string> {
   if (!sel) return {};
   switch (sel.kind) {
@@ -111,29 +126,72 @@ export default function MapPage({ loaderData }: Route.ComponentProps) {
   const reducedMotion = useReducedMotion();
   const [params, setParams] = useSearchParams();
   const initial = useMemo(() => fromSearch(params), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const initialPlan = useMemo(() => ({ start: pointParam(params.get("from")), end: pointParam(params.get("to")) }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [visible, setVisible] = useState<Record<LayerGroupId, boolean>>(defaultVisibility);
   const [selected, setSelected] = useState<MapSelection | null>(initial?.selection ?? null);
   const [flyTo, setFlyTo] = useState<FlyTarget | null>(initial?.fly ?? null);
-  const [legendOpen, setLegendOpen] = useState(false);
+  const [sheet, setSheet] = useState<"legend" | "planner" | null>(initialPlan.start || initialPlan.end ? "planner" : null);
+  const planner = usePlanner(initialPlan);
 
   const content = useMemo(mapContent, []);
   const scenicNames = useMemo(scenicVillageNames, []);
+  const index = useMemo(() => searchIndex(tours, (slug) => TOUR_LINKS.find((t) => t.slug === slug)?.at), [tours]);
 
-  const select = useCallback(
-    (sel: MapSelection | null, fly?: boolean) => {
-      setSelected(sel);
-      if (sel) setLegendOpen(false);
-      if (fly && sel) {
-        const at = flyTargetFor(sel);
-        if (at) setFlyTo(at);
-      }
-      setParams(toSearch(sel), { replace: true, preventScrollReset: true });
+  // Everything that is in the address bar: the pick, or the planned ride.
+  const syncUrl = useCallback(
+    (sel: MapSelection | null, start: PlanPoint | null, end: PlanPoint | null) => {
+      const next = { ...toSearch(sel), ...(start && { from: pointStr(start) }), ...(end && { to: pointStr(end) }) };
+      setParams(next, { replace: true, preventScrollReset: true });
     },
     [setParams],
   );
 
+  const select = useCallback(
+    (sel: MapSelection | null, fly?: boolean) => {
+      setSelected(sel);
+      if (sel) setSheet(null);
+      if (fly && sel) {
+        const at = flyTargetFor(sel);
+        if (at) setFlyTo(at);
+      }
+      syncUrl(sel, planner.state.start, planner.state.end);
+    },
+    [syncUrl, planner.state.start, planner.state.end],
+  );
+
+  const setPoint = (which: "start" | "end", p: PlanPoint | null) => {
+    planner.setPoint(which, p);
+    const start = which === "start" ? p : planner.state.start;
+    const end = which === "end" ? p : planner.state.end;
+    syncUrl(selected, start, end);
+    if (p && !(start && end)) setFlyTo({ center: p.at, zoom: 11 });
+  };
+
+  const onPick = (at: LngLat) => {
+    const which = planner.state.picking;
+    if (!which) return;
+    const near = VILLAGES.find((v) => Math.abs(v.at[0] - at[0]) < 0.004 && Math.abs(v.at[1] - at[1]) < 0.002);
+    setPoint(which, { at, label: near ? near.name : planPointLabel(at) });
+    setSheet("planner");
+  };
+
+  const goTo = (h: SearchHit) => {
+    if (h.selection) select(h.selection, true);
+    else {
+      setFlyTo({ center: h.at, zoom: h.zoom });
+      setSheet(null);
+    }
+  };
+
   const toggle = (id: LayerGroupId) => setVisible((v) => ({ ...v, [id]: !v[id] }));
+  const planned: PlannedRoute | null = planner.state.result && planner.state.start && planner.state.end ? { coords: planner.state.result.coords, start: planner.state.start.at, end: planner.state.end.at } : null;
+  const picking = planner.state.picking;
+
+  const openSheet = (which: "legend" | "planner") => {
+    setSheet(which);
+    if (selected) select(null);
+  };
 
   return (
     <div className="flex h-dvh flex-col">
@@ -141,38 +199,66 @@ export default function MapPage({ loaderData }: Route.ComponentProps) {
       <main className="relative min-h-0 flex-1 bg-[#e3e9d7]" aria-label="Cycling map of the Faroe Islands">
         {hydrated ? (
           <Suspense fallback={<MapSkeleton />}>
-            <FaroeMap content={content} scenicNames={scenicNames} visible={visible} selected={selected} flyTo={flyTo} reducedMotion={reducedMotion} onSelect={select} />
+            <FaroeMap content={content} scenicNames={scenicNames} visible={visible} selected={selected} flyTo={flyTo} reducedMotion={reducedMotion} onSelect={select} planned={planned} picking={picking} onPick={onPick} />
           </Suspense>
         ) : (
           <MapSkeleton />
         )}
 
-        {/* the legend pill sits bottom-left, clear of the zoom buttons and the scale */}
-        {!legendOpen && (
-          <PillButton
-            size="sm"
-            tone="primary"
-            onClick={() => {
-              setLegendOpen(true);
-              if (selected) select(null);
-            }}
-            className="absolute bottom-[max(14px,env(safe-area-inset-bottom))] left-4 z-10 shadow-[0_6px_24px_rgba(0,0,0,.3)]"
-            aria-expanded={legendOpen}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-              <path d="M4 6h16M4 12h16M4 18h10" />
-            </svg>
-            Legend
-          </PillButton>
+        {/* while a point is being picked the sheets get out of the way */}
+        {picking && (
+          <div className="absolute inset-x-4 top-4 z-20 flex items-center gap-3 rounded-full bg-night/90 px-5 py-3 text-[14.5px] text-ink shadow-[0_8px_30px_rgba(0,0,0,.35)] backdrop-blur lg:inset-x-auto lg:left-1/2 lg:-translate-x-1/2">
+            <span className={cx("size-3 shrink-0 rounded-full", picking === "start" ? "bg-ok" : "bg-[#e0245e]")} aria-hidden />
+            <span className="flex-1">Tap the map where the ride {picking === "start" ? "starts" : "ends"}</span>
+            <button type="button" onClick={() => planner.set({ picking: null })} className="font-semibold text-brand-bright hover:text-ink">
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* the pills sit bottom-left, clear of the zoom buttons and the scale */}
+        {!sheet && !picking && (
+          <div className="absolute bottom-[max(14px,env(safe-area-inset-bottom))] left-4 z-10 flex gap-2">
+            <PillButton size="sm" tone="primary" onClick={() => openSheet("legend")} className="shadow-[0_6px_24px_rgba(0,0,0,.3)]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                <path d="M4 6h16M4 12h16M4 18h10" />
+              </svg>
+              Legend
+            </PillButton>
+            <PillButton size="sm" tone={planned ? "brand" : "ghost"} onClick={() => openSheet("planner")} className={cx("shadow-[0_6px_24px_rgba(0,0,0,.3)] backdrop-blur", !planned && "bg-night/85! text-ink")}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="6" r="3" />
+                <path d="M8.5 16.5 15.5 8" />
+              </svg>
+              {planned ? "Your ride" : "Plan a ride"}
+            </PillButton>
+          </div>
         )}
 
         <MapLegend
-          open={legendOpen}
+          open={sheet === "legend" && !picking}
           visible={visible}
+          index={index}
+          onGo={goTo}
           onToggle={toggle}
           onReset={() => setVisible(defaultVisibility())}
           onTunnel={(t) => select(tunnelSelection(t), true)}
-          onClose={() => setLegendOpen(false)}
+          onClose={() => setSheet(null)}
+        />
+        <PlannerPanel
+          open={sheet === "planner" && !picking}
+          state={planner.state}
+          onPoint={setPoint}
+          onPick={(which) => planner.set({ picking: which })}
+          onOptions={(options) => planner.set({ options })}
+          onSwap={planner.swap}
+          onClear={() => {
+            planner.clear();
+            syncUrl(selected, null, null);
+          }}
+          onSelect={select}
+          onClose={() => setSheet(null)}
         />
         <FeaturePanel selection={selected} tours={tours} onSelect={select} onClose={() => select(null)} />
 

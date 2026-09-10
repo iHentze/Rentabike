@@ -9,6 +9,7 @@
  * a street map.
  */
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import { PRINT_OVERLAY } from "~/data/map/print";
 import type { LayerGroupId, MapContent } from "~/data/map/types";
 
 export const FAROE_BOUNDS: [[number, number], [number, number]] = [
@@ -67,6 +68,8 @@ const FONT = {
 };
 
 const ex = (e: unknown) => e as ExpressionSpecification;
+/** A 1×1 transparent PNG, so the overlay source is valid before the print is in the repo. */
+const EMPTY_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 /** A width that grows with zoom: `at8` px at zoom 8, `at14` px at zoom 14. */
 const grow = (at8: number, at14: number) => ex(["interpolate", ["exponential", 1.5], ["zoom"], 8, at8, 14, at14]);
 const cls = (c: string) => ex(["==", ["get", "cls"], c]);
@@ -92,6 +95,7 @@ export const LAYER_GROUPS: Record<LayerGroupId, string[]> = {
   notes: ["notes", "notes-selected"],
   loops: ["loop-halo", "loop-label", "loops-selected"],
   tours: ["tour-halo", "tour-line", "tours-selected"],
+  print: ["print-overlay"],
 };
 
 /** Layers a click can land on, top-most first. */
@@ -164,6 +168,14 @@ export function buildStyle(content: MapContent, scenicNames: string[]): StyleSpe
         "hillshade-illumination-anchor": "map",
         "hillshade-illumination-direction": 335,
       },
+    },
+    // The print itself, off by default, for checking the redrawn roads.
+    {
+      id: "print-overlay",
+      type: "raster",
+      source: "print",
+      layout: { visibility: "none" },
+      paint: { "raster-opacity": PRINT_OVERLAY.opacity, "raster-fade-duration": 0 },
     },
     {
       id: "waterway",
@@ -390,6 +402,31 @@ export function buildStyle(content: MapContent, scenicNames: string[]): StyleSpe
       paint: { "line-color": PAPER.brand, "line-width": grow(3, 18), "line-opacity": ex(["*", 0.4, selectedWidth]) },
     },
 
+    // --- the planned ride ------------------------------------------------
+    {
+      id: "planned-casing",
+      type: "line",
+      source: "planned",
+      filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": PAPER.white, "line-width": grow(6, 13) },
+    },
+    {
+      id: "planned-line",
+      type: "line",
+      source: "planned",
+      filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#e0245e", "line-width": grow(3, 7) },
+    },
+    {
+      id: "planned-ends",
+      type: "circle",
+      source: "planned",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-radius": 7, "circle-color": ex(["match", ["get", "end"], "start", "#2ed47a", "#e0245e"]), "circle-stroke-color": PAPER.white, "circle-stroke-width": 2.5 },
+    },
+
     // --- points ----------------------------------------------------------
     {
       id: "hazards",
@@ -596,6 +633,8 @@ export function buildStyle(content: MapContent, scenicNames: string[]): StyleSpe
       notes: { type: "geojson", data: content.notes, promoteId: "id" },
       labels: { type: "geojson", data: content.labels, promoteId: "id" },
       distances: { type: "geojson", data: content.distances, promoteId: "id" },
+      planned: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      print: { type: "image", url: PRINT_OVERLAY.available ? PRINT_OVERLAY.url : EMPTY_IMAGE, coordinates: PRINT_OVERLAY.corners },
     },
     layers,
   };

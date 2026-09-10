@@ -3,10 +3,16 @@
  * tunnels" panel, a callout, a place, a ferry, a loop, or one of our tours
  * with a way to book it.
  */
+import { useEffect, useState } from "react";
+import type { Feature, FeatureCollection, MultiLineString } from "geojson";
 import { iconDataUrl, type IconId } from "./icons";
+import { ProfileChart, useProfile } from "./profile-chart";
 import { Sheet } from "./sheet";
-import { Lbl, PillLink, Price, Tag, cx } from "~/components/ui";
-import { LOOPS, NOTES, POIS, TUNNELS } from "~/data/map";
+import { MAP_DATA_URLS } from "./style";
+import { download, toGpx } from "~/lib/map/gpx";
+import type { Coord } from "~/lib/map/router";
+import { Lbl, PillButton, PillLink, Price, Tag, cx } from "~/components/ui";
+import { LOOPS, NOTES, POIS, TIMETABLES_URL, TUNNELS } from "~/data/map";
 import type { MapSelection, MapTour, Poi, TunnelInfo } from "~/data/map/types";
 import { fmtDuration } from "~/lib/format";
 
@@ -72,6 +78,11 @@ export function FeaturePanel({ selection, tours, onSelect, onClose }: {
               Open {new URL(p.url).host} ↗
             </a>
           )}
+          {(p.kind === "bus" || p.kind === "busStop" || p.kind === "ferryPort") && (
+            <a href={TIMETABLES_URL} target="_blank" rel="noreferrer" className="text-[14.5px] font-semibold text-brand-bright hover:text-ink">
+              Timetables at ssl.fo ↗
+            </a>
+          )}
           <TourCards slugs={p.tourSlugs ?? []} find={tourBySlug} />
         </div>
       );
@@ -85,7 +96,7 @@ export function FeaturePanel({ selection, tours, onSelect, onClose }: {
             {selection.bikes ? "Bikes accepted" : "Bikes not accepted"}
           </Tag>
           {selection.note && <p className="text-[15px] leading-[1.5]">{selection.note}</p>}
-          <a href="https://www.ssl.fo" target="_blank" rel="noreferrer" className="text-[14.5px] font-semibold text-brand-bright hover:text-ink">
+          <a href={TIMETABLES_URL} target="_blank" rel="noreferrer" className="text-[14.5px] font-semibold text-brand-bright hover:text-ink">
             Timetables at ssl.fo ↗
           </a>
         </div>
@@ -101,6 +112,7 @@ export function FeaturePanel({ selection, tours, onSelect, onClose }: {
             {l.includesBus && <span className="rounded-full bg-white/6 px-[10px] py-1 text-[12px] text-ink-soft">Includes a bus transfer</span>}
           </div>
           <p className="text-[15px] leading-[1.5]">{l.description}</p>
+          <RideFacts kind="loops" id={l.id} name={l.name} />
           <TourCards slugs={l.tourSlugs ?? []} find={tourBySlug} />
         </div>
       );
@@ -109,7 +121,12 @@ export function FeaturePanel({ selection, tours, onSelect, onClose }: {
     case "tour": {
       const t = tourBySlug(selection.slug);
       title = t?.title ?? "Guided tour";
-      body = t ? <TourCard tour={t} big /> : <p className="text-ink-soft">This tour is not in the catalogue right now.</p>;
+      body = (
+        <div className="flex flex-col gap-4">
+          {t ? <TourCard tour={t} big /> : <p className="text-ink-soft">This tour is not in the catalogue right now.</p>}
+          <RideFacts kind="tours" id={selection.slug} name={t?.title ?? selection.slug} />
+        </div>
+      );
       break;
     }
   }
@@ -202,6 +219,44 @@ function TourCard({ tour, big }: { tour: MapTour; big?: boolean }) {
           </PillLink>
         </div>
       </div>
+    </div>
+  );
+}
+
+const lineCache = new Map<string, Promise<FeatureCollection>>();
+function lines(kind: "loops" | "tours"): Promise<FeatureCollection> {
+  let p = lineCache.get(kind);
+  if (!p) {
+    p = fetch(MAP_DATA_URLS[kind]).then((r) => r.json() as Promise<FeatureCollection>);
+    lineCache.set(kind, p);
+  }
+  return p;
+}
+
+/** Climb, profile and a GPX for a loop or a tour, from its drawn geometry. */
+function RideFacts({ kind, id, name }: { kind: "loops" | "tours"; id: string; name: string }) {
+  const [coords, setCoords] = useState<Coord[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setCoords(null);
+    lines(kind)
+      .then((fc) => {
+        const f = fc.features.find((x) => x.id === id) as Feature<MultiLineString> | undefined;
+        if (live && f) setCoords(f.geometry.coordinates.flat() as Coord[]);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [kind, id]);
+  const { profile, loading } = useProfile(coords);
+  if (!coords) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <ProfileChart profile={profile} loading={loading} />
+      <PillButton tone="ghost" size="sm" className="self-start" onClick={() => download(`${id}.gpx`, toGpx(name, coords, profile && profile.d.length === coords.length ? profile.e : undefined))}>
+        Download GPX
+      </PillButton>
     </div>
   );
 }

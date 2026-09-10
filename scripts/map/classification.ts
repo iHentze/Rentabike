@@ -137,4 +137,10 @@ export const TOUR_ROUTES: RouteSpec[] = [
   { id: "viewpoint-nordadalsskard", via: ["Tórshavn", "@62.0180,-6.8200", "Norðradalur"] },
   { id: "westward-journey", via: ["@62.0640,-6.9640", "@62.0330,-6.8900", "Norðradalur"] },
   { id: "clifftop-bliss-sandoy", via: ["Skopun", "Sandur", "Skálavík"] },
+  // The city loops: south along the shore to Argir, back through town and out to Hoyvík.
+  { id: "city-sightseeing-ebike", via: ["Tórshavn", "Argir", "Tórshavn", "Hoyvík", "Tórshavn"] },
+  { id: "city-sightseeing-ebike-photoshoot", via: ["Tórshavn", "Argir", "Tórshavn", "Hoyvík", "Tórshavn"] },
+  // The hike-and-bike days: the ride is drawn, the walk is not a road.
+  { id: "hike-bike-pilgrims-path", via: ["Tórshavn", "@62.0080,-6.8130"] },
+  { id: "hike-bike-viewpoint-mountain-plateau", via: ["Tórshavn", "@62.0180,-6.8200", "@62.0330,-6.8900"] },
 ];

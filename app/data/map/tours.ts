@@ -10,4 +10,8 @@ export const TOUR_LINKS: TourLink[] = [
   { slug: "viewpoint-nordadalsskard", at: [-6.87, 62.03], zoom: 11.6 },
   { slug: "westward-journey", at: [-6.9, 62.05], zoom: 11.2 },
   { slug: "clifftop-bliss-sandoy", at: [-6.76, 61.84], zoom: 11.4 },
+  { slug: "city-sightseeing-ebike", at: [-6.775, 62.005], zoom: 12.5 },
+  { slug: "city-sightseeing-ebike-photoshoot", at: [-6.775, 62.005], zoom: 12.5 },
+  { slug: "hike-bike-pilgrims-path", at: [-6.8, 61.99], zoom: 12 },
+  { slug: "hike-bike-viewpoint-mountain-plateau", at: [-6.86, 62.025], zoom: 11.8 },
 ];

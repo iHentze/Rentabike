@@ -15,6 +15,10 @@ import type { LngLat, MapContent } from "./types";
 
 export { DISTANCES, LABELS, LOOPS, NOTES, POIS, TOUR_LINKS, TUNNELS };
 
+/** When the shop last walked through the notes and tunnels against the real roads. */
+export const REVIEWED = "10 September 2026";
+export const TIMETABLES_URL = "https://www.ssl.fo/en/";
+
 function point<P extends { id: string; at: LngLat }>(item: P): Feature<Point, Omit<P, "at">> {
   const { at, ...properties } = item;
   return { type: "Feature", id: item.id, geometry: { type: "Point", coordinates: at }, properties };

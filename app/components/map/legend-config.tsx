@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { iconDataUrl, type IconId } from "./icons";
 import { PAPER } from "./style";
+import { PRINT_OVERLAY } from "~/data/map/print";
 import type { LayerGroupId } from "~/data/map/types";
 
 export interface LegendRow {
@@ -86,7 +87,14 @@ export const LEGEND: LegendSection[] = [
       { id: "tours", label: "Our guided tours", swatch: <Line color={PAPER.brand} width={3} dash="4 5" />, defaultOn: true },
     ],
   },
+  {
+    title: "Checking",
+    rows: [{ id: "print", label: "The 2025 print, as a picture over the map", swatch: <span className="flex w-12 shrink-0 justify-center text-[11px] font-bold text-[#4a545c]">2025</span>, defaultOn: false }],
+  },
 ];
+
+/** Rows that need something not in the repo yet stay hidden. */
+export const LEGEND_SHOWN: LegendSection[] = LEGEND.filter((s) => s.title !== "Checking" || PRINT_OVERLAY.available);
 
 export function defaultVisibility(): Record<LayerGroupId, boolean> {
   const v = {} as Record<LayerGroupId, boolean>;

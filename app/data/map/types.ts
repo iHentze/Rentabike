@@ -185,6 +185,7 @@ export const LAYER_GROUP_IDS = [
   "notes",
   "loops",
   "tours",
+  "print",
 ] as const;
 export type LayerGroupId = (typeof LAYER_GROUP_IDS)[number];
 
@@ -208,4 +209,11 @@ export interface MapTour {
   image: string | null;
   weekday: string | null;
   nextSeatsLeft: number | null;
+}
+
+/** A planned ride: where it starts and ends, and what the router found. */
+export interface PlannedRoute {
+  coords: LngLat[];
+  start: LngLat;
+  end: LngLat;
 }

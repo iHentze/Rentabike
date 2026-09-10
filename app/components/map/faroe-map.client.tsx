@@ -7,14 +7,14 @@
  * where to fly); this component mirrors it onto the map and reports clicks.
  */
 import { useEffect, useRef } from "react";
-import { AttributionControl, Map as MapLibre, NavigationControl, ScaleControl, setWorkerUrl, type MapGeoJSONFeature } from "maplibre-gl";
+import { AttributionControl, GeolocateControl, Map as MapLibre, NavigationControl, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapGeoJSONFeature } from "maplibre-gl";
 // MapLibre parses tiles in a web worker it locates relative to its own module
 // URL, which does not survive bundling. Vite bundles the worker with its
 // imports and hands us the address instead.
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { ICONS, type IconId } from "./icons";
 import { FAROE_BOUNDS, INTERACTIVE_LAYERS, LAYER_GROUPS, MAX_BOUNDS, buildStyle } from "./style";
-import type { FlyTarget, LayerGroupId, MapContent, MapSelection, TunnelLetter } from "~/data/map/types";
+import type { FlyTarget, LayerGroupId, LngLat, MapContent, MapSelection, PlannedRoute, TunnelLetter } from "~/data/map/types";
 
 export interface FaroeMapProps {
   content: MapContent;
@@ -25,6 +25,11 @@ export interface FaroeMapProps {
   reducedMotion: boolean;
   onSelect: (selection: MapSelection | null) => void;
   onReady?: () => void;
+  /** The ride planner's result, drawn on top of everything. */
+  planned?: PlannedRoute | null;
+  /** While set, a click on the map reports a point instead of picking a feature. */
+  picking?: "start" | "end" | null;
+  onPick?: (at: LngLat) => void;
 }
 
 setWorkerUrl(workerUrl);
@@ -88,13 +93,17 @@ export function selectionFrom(f: MapGeoJSONFeature): MapSelection | null {
   }
 }
 
-export default function FaroeMap({ content, scenicNames, visible, selected, flyTo, reducedMotion, onSelect, onReady }: FaroeMapProps) {
+export default function FaroeMap({ content, scenicNames, visible, selected, flyTo, reducedMotion, onSelect, onReady, planned, picking, onPick }: FaroeMapProps) {
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibre | null>(null);
   const readyRef = useRef(false);
   const selectedRef = useRef<MapSelection | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const pickingRef = useRef(picking);
+  pickingRef.current = picking;
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
 
   // Create once. Everything data-driven is passed at construction; the props
   // that change afterwards are handled by the effects below.
@@ -117,9 +126,11 @@ export default function FaroeMap({ content, scenicNames, visible, selected, flyT
     map.touchZoomRotate.disableRotation();
     map.keyboard.disableRotation();
     map.addControl(new NavigationControl({ showCompass: false }), "top-left");
+    map.addControl(new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showUserLocation: true }), "top-left");
     map.addControl(new ScaleControl({ unit: "metric" }), "bottom-right");
     map.addControl(new AttributionControl({ compact: true, customAttribution: CREDIT }), "bottom-right");
     map.getCanvas().setAttribute("aria-label", "Cycling map of the Faroe Islands");
+    if (picking) map.getCanvas().style.cursor = "crosshair";
 
     // Icons are rasterised on demand from the SVG strings — no sprite sheet.
     map.setMissingStyleImageResolver(async (id) => {
@@ -135,10 +146,18 @@ export default function FaroeMap({ content, scenicNames, visible, selected, flyT
 
     const canvas = map.getCanvas();
     map.on("mousemove", (e) => {
+      if (pickingRef.current) {
+        canvas.style.cursor = "crosshair";
+        return;
+      }
       const hit = map.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS });
       canvas.style.cursor = hit.length ? "pointer" : "";
     });
     map.on("click", (e) => {
+      if (pickingRef.current) {
+        onPickRef.current?.([e.lngLat.lng, e.lngLat.lat]);
+        return;
+      }
       const hit = map.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0];
       onSelectRef.current(hit ? selectionFrom(hit) : null);
     });
@@ -181,6 +200,45 @@ export default function FaroeMap({ content, scenicNames, visible, selected, flyT
     applySelection(map, selectedRef.current, selected);
     selectedRef.current = selected;
   }, [selected]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const src = map.getSource("planned") as GeoJSONSource | undefined;
+      if (!src) return;
+      src.setData(
+        planned
+          ? {
+              type: "FeatureCollection",
+              features: [
+                { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: planned.coords } },
+                { type: "Feature", properties: { end: "start" }, geometry: { type: "Point", coordinates: planned.start } },
+                { type: "Feature", properties: { end: "end" }, geometry: { type: "Point", coordinates: planned.end } },
+              ],
+            }
+          : { type: "FeatureCollection", features: [] },
+      );
+    };
+    if (readyRef.current) apply();
+    else map.once("style.load", apply);
+    if (planned && planned.coords.length > 1) {
+      // Show the whole ride, leaving room for the planner card on a wide screen.
+      let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+      for (const [x, y] of planned.coords) {
+        if (x < w) w = x;
+        if (x > e) e = x;
+        if (y < s) s = y;
+        if (y > n) n = y;
+      }
+      const el = map.getContainer();
+      const wide = el.clientWidth >= 1024;
+      // The planner card sits at the left on a wide screen, at the bottom on a phone.
+      const padding = wide ? { top: 60, bottom: 60, left: 420, right: 40 } : { top: 40, bottom: Math.round(el.clientHeight * 0.58), left: 30, right: 30 };
+      map.fitBounds([[w, s], [e, n]], { padding, maxZoom: 13, duration: reducedMotion ? 0 : 800 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planned]);
 
   useEffect(() => {
     const map = mapRef.current;

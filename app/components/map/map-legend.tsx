@@ -2,15 +2,19 @@
  * The legend: every row is a switch for its layers, and the "Special
  * tunnels" index jumps to the tunnel's text.
  */
-import { LEGEND } from "./legend-config";
+import { LEGEND_SHOWN } from "./legend-config";
+import { PlaceSearch } from "./place-search";
+import type { SearchHit } from "./search";
 import { Sheet } from "./sheet";
 import { Lbl, cx } from "~/components/ui";
-import { TUNNELS } from "~/data/map";
+import { REVIEWED, TUNNELS } from "~/data/map";
 import type { LayerGroupId, TunnelInfo } from "~/data/map/types";
 
-export function MapLegend({ open, visible, onToggle, onReset, onTunnel, onClose }: {
+export function MapLegend({ open, visible, index, onGo, onToggle, onReset, onTunnel, onClose }: {
   open: boolean;
   visible: Record<LayerGroupId, boolean>;
+  index: SearchHit[];
+  onGo: (hit: SearchHit) => void;
   onToggle: (id: LayerGroupId) => void;
   onReset: () => void;
   onTunnel: (t: TunnelInfo) => void;
@@ -20,7 +24,8 @@ export function MapLegend({ open, visible, onToggle, onReset, onTunnel, onClose 
   return (
     <Sheet open={open} side="left" title="Legend" onClose={onClose}>
       <div className="flex flex-col gap-5">
-        {LEGEND.map((section) => (
+        <PlaceSearch index={index} placeholder="Find a village, a tunnel, a tour…" onPick={onGo} />
+        {LEGEND_SHOWN.map((section) => (
           <div key={section.title} className="flex flex-col gap-[6px]">
             <Lbl>{section.title}</Lbl>
             <div className="flex flex-col">
@@ -68,7 +73,7 @@ export function MapLegend({ open, visible, onToggle, onReset, onTunnel, onClose 
         )}
 
         <p className="border-t border-white/7 pt-4 text-[12px] leading-[1.5] text-ink-dim">
-          Map design © R Hokwerda, 27 February 2025. Background by Meinhard Absalon. Reproduced with permission. Classification of Class A routes is the author's personal discretion and not officially endorsed. Roads © OpenStreetMap contributors; tiles © OpenFreeMap.
+          Notes and tunnels last reviewed {REVIEWED}. Map design © R Hokwerda, 27 February 2025. Background by Meinhard Absalon. Reproduced with permission. Classification of Class A routes is the author's personal discretion and not officially endorsed. Roads © OpenStreetMap contributors; tiles © OpenFreeMap.
         </p>
       </div>
     </Sheet>
