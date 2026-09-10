@@ -19,5 +19,6 @@ commits the result.
 | `ferries.geojson` | ferry routes, `bikes` true/false |
 | `loops.geojson` | the named loops as MultiLineStrings |
 | `tours.geojson` | our guided tours, `tourSlug` |
+| `print-2025.webp` | the print itself, shown over the map from the legend to check the redrawn roads against it (corners in `app/data/map/print.ts`) |
 
 Road geometry © OpenStreetMap contributors, ODbL. Map design © R Hokwerda 2025.

@@ -25,10 +25,12 @@ export interface RouteSpec {
 export const CLASS_A: RouteSpec[] = [
   // Vágar
   { id: "gasadalur", via: ["Gásadalur", "Bøur", "Sørvágur"], buttercup: true, allowTunnel: true },
-  { id: "vagar-south", via: ["Sørvágur", "Miðvágur", "Sandavágur", "Vatnsoyrar"] },
+  { id: "vagar-south", via: ["Sørvágur", "Miðvágur", "Sandavágur"] },
   // Streymoy
   { id: "kirkjubour-loop", via: ["Tórshavn", "Velbastaður", "Kirkjubøur", "@61.9624,-6.8189", "Velbastaður", "Tórshavn"], buttercup: true },
   { id: "nordradalur", via: ["@62.0180,-6.8200", "Norðradalur"], singleLane: true },
+  // "Scenic ride to nowhere": the road out to Syðradalur on Streymoy.
+  { id: "sydradalur-streymoy", via: ["Velbastaður", "@62.0187,-6.9132"] },
   { id: "kaldbak", via: ["Hvítanes", "Sund", "Kaldbaksbotnur", "Kaldbak"] },
   { id: "kollafjordur-old", via: ["Kaldbaksbotnur", "Kollafjørður"] },
   { id: "leynar-vestmanna", via: ["Leynar", "Skælingur", "Kvívík", "Vestmanna"] },
@@ -46,23 +48,37 @@ export const CLASS_A: RouteSpec[] = [
   { id: "aeduvik", via: ["Runavík", "Rituvík", "Æðuvík"], buttercup: true },
   { id: "toftir-nes", via: ["Toftir", "@62.0778,-6.7195"] },
   { id: "fuglafjordur", via: ["Leirvík", "Fuglafjørður"] },
+  // "Disused highway: scenic & tranquil" — the old road over Gøtueiði, not the tunnel.
+  { id: "gotueidi", via: ["Norðragøta", "Leirvík"] },
   // Norðoyar
   { id: "vidareidi", via: ["Klaksvík", "Árnafjørður", "Hvannasund", "Viðareiði"], buttercup: true, allowTunnel: true },
   { id: "kunoy", via: ["Klaksvík", "Haraldssund", "Kunoy"], allowTunnel: true },
   { id: "kalsoy", via: ["@62.2453,-6.6678", "Húsar", "Mikladalur", "Trøllanes"], singleLane: true, allowTunnel: true },
   { id: "fugloy", via: ["Kirkja", "Hattarvík"] },
+  { id: "muli", via: ["Norðdepil", "Múli"] },
+  // "Former main road: scenic & tranquil" — the old road up the east side of Viðoy, beside the tunnel.
+  { id: "vidoy-old-road", via: ["Hvannasund", "@62.3380,-6.5220", "Viðareiði"] },
+  { id: "nordoyri", via: ["Klaksvík", "Norðoyri"] },
   // Sandoy
   { id: "sandoy", via: ["Skopun", "Sandur", "Skálavík", "Húsavík", "Dalur"], buttercup: true },
   { id: "skarvanes", via: ["Sandur", "Skarvanes"] },
+  // West to the bay at Søltuvík, gravel, with the buttercup.
+  { id: "soltuvik", via: ["Sandur", "@61.8420,-6.8760"], buttercup: true },
   // Suðuroy
   { id: "hvalba", via: ["Sandvík", "Hvalba", "Trongisvágur", "Tvøroyri"], allowTunnel: true },
   { id: "famjin", via: ["Trongisvágur", "Fámjin"], buttercup: true },
+  { id: "frodba", via: ["Tvøroyri", "Froðba"] },
   { id: "hov-vagur", via: ["Tvøroyri", "Ørðavík", "Hov", "Porkeri", "Vágur"], buttercup: true },
-  { id: "sumba", via: ["Vágur", "Lopra", "Sumba", "Akrar"], allowTunnel: true },
+  // "Scenic rides to nowhere" west of Vágur.
+  { id: "famara", via: ["Vágur", "Í Fámara"] },
+  { id: "vikarbyrgi", via: ["Vágur", "Akrar", "Víkarbyrgi"] },
+  // "Um Hestin": the old road over the mountain to Sumba; the tunnel is the bike-friendly alternative.
+  { id: "sumba-hestin", via: ["Vágur", "Lopra", "@61.4308,-6.7590", "Sumba"] },
+  { id: "sumba-tunnel", via: ["Lopra", "Sumba"], allowTunnel: true },
 ];
 
 /** Roads the print draws as "other main road" though OSM would rank them lower, or the reverse. */
-export const MAIN: RouteSpec[] = [];
+export const MAIN: RouteSpec[] = [{ id: "hellur", via: ["Fuglafjørður", "Hellurnar"] }];
 
 /** "Local or semi-public road with bike access" — the white lines the print picks out. */
 export const LOCAL: RouteSpec[] = [

@@ -8,9 +8,9 @@ import type { LngLat } from "./types";
  * small misfit at the edges is expected.
  */
 export const PRINT_OVERLAY = {
-  /** Set true once public/map/print-2025.jpg is in the repo. */
-  available: false,
-  url: "/map/print-2025.jpg",
+  /** The 1707×2048 export of the print, public/map/print-2025.webp. */
+  available: true,
+  url: "/map/print-2025.webp",
   corners: [
     // Fitted from thirteen villages read off the print; good to a kilometre or two.
     [-7.8999, 62.4181],
