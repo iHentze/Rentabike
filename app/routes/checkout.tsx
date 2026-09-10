@@ -53,7 +53,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     .filter((a) => ownBike || a.unit === "per_booking" || basket.addons[a.id])
     .sort((a, b) => (a.id === HELMET_ID ? -1 : b.id === HELMET_ID ? 1 : a.priceMinor - b.priceMinor || a.name.localeCompare(b.name)))
     .map((a) => ({ id: a.id, name: a.name, priceMinor: a.priceMinor, unit: a.unit, isSale: a.isSale, image: a.image, qty: basket.addons[a.id] ?? 0 }));
-  const helmetMissing = tour || ownBike ? [] : basket.riders.map((r, i) => ({ r, i })).filter(({ r }) => r.bikeTypeId && !(r.addons[HELMET_ID] ?? 0)).map(({ i }) => ({ r: i, label: riderLabel(basket, i) }));
+  const helmetMissing = tour || ownBike ? [] : basket.riders.map((r, i) => ({ r, i })).filter(({ r }) => r.bikeTypeId && !(r.addons[HELMET_ID] ?? 0) && !r.helmetDeclined).map(({ i }) => ({ r: i, label: riderLabel(basket, i) }));
   const unfinished = nextStep(basket);
 
   // The recovery panel: a bike went between choosing and paying.
@@ -337,7 +337,7 @@ export default function Checkout({ loaderData }: Route.ComponentProps) {
           {error === "seats" && <Note icon={<Warning size={17} />}>That departure can't take {trip.riders} more — pick another date on the tour page.</Note>}
           {error === "bikes" && (
             <Note icon={<Warning size={17} />}>
-              Every rider needs a name, a height and a bike before we can hold them — the shop sizes each frame to the person.{" "}
+              Every rider needs a height and a bike before we can hold them — the shop sizes each frame to the person.{" "}
               <Link to={tripHref("/riders", trip)} className="font-semibold text-brand-bright">Back to the riders</Link>
             </Note>
           )}

@@ -15,6 +15,8 @@ export interface BasketRider {
   addons: Record<string, number>;
   /** The rider has been through their extras step, even if they chose nothing. */
   extrasDone?: boolean;
+  /** Asked about a helmet by name and said no. Without this a "no" leaves no trace and the question looks unanswered. */
+  helmetDeclined?: boolean;
 }
 
 export interface Basket {
@@ -70,7 +72,7 @@ export interface BasketPeek {
   riders: number;
   /** Riders with a bike picked. */
   withBike: number;
-  /** Riders with a bike, a name and a height — the ones the counter can fit. */
+  /** Riders with a bike and a height — the ones the counter can fit. */
   ridersReady: number;
   /** Own-bike bookings: helmets and bags only, no rider steps. */
   ownBike: boolean;
@@ -125,6 +127,7 @@ function cleanRider(r: unknown): BasketRider {
     bikeTypeId: typeof o.bikeTypeId === "string" ? o.bikeTypeId : undefined,
     addons: cleanCounts(o.addons),
     extrasDone: o.extrasDone === true,
+    helmetDeclined: o.helmetDeclined === true,
   };
 }
 
@@ -148,12 +151,12 @@ export function ridersOn(basket: Basket, bikeTypeId: string): number {
 }
 
 /**
- * A rider we can hand a bike to: a name for the counter and a height for the
- * frame. Nothing about a rider's bike is settled until both are there — the
- * shop cannot size a bike for "Rider 2, height unknown".
+ * A rider we can hand a bike to: one with a height, because the frame is
+ * sized to the rider. A name is welcome but not needed — "Rider 2" is a
+ * perfectly good label at the counter.
  */
 export function riderReady(r: BasketRider): boolean {
-  return Boolean(r.name?.trim()) && typeof r.heightCm === "number";
+  return typeof r.heightCm === "number";
 }
 
 /** The first rider still without a bike, or -1. */

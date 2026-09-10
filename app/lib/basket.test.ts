@@ -32,8 +32,8 @@ describe("nextStep — one rider at a time, bike then extras", () => {
     b.riders.forEach((r) => (r.extrasDone = true));
     expect(nextStep(b)).toBeNull();
   });
-  it("keeps a rider on the bike step until they have a name and a height, bike or no bike", () => {
-    // The chooser and the catalogue can put a bike on a rider before anyone asked who they are.
+  it("keeps a rider on the bike step until they have a height, bike or no bike", () => {
+    // The chooser and the catalogue can put a bike on a rider before anyone asked how tall they are.
     const b = basket();
     b.riders[1]!.bikeTypeId = "centurion-l";
     b.riders.forEach((r) => (r.extrasDone = true));
@@ -41,9 +41,7 @@ describe("nextStep — one rider at a time, bike then extras", () => {
     expect(riderReady(b.riders[1]!)).toBe(false);
     expect(nextStep(b)).toEqual({ rider: 1, step: "bike" });
     b.riders[1]!.heightCm = 182;
-    b.riders[1]!.name = "  ";
-    expect(nextStep(b)).toEqual({ rider: 1, step: "bike" });
-    b.riders[1]!.name = "Marek";
+    delete b.riders[1]!.name; // a name is not required — "Rider 2" will do
     expect(nextStep(b)).toBeNull();
   });
 });

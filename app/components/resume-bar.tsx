@@ -27,7 +27,7 @@ export function ResumeBar({ resume, when }: { resume: BasketPeek; when: { startA
         ? `${plural(resume.riders, "bike")} chosen`
         : resume.withBike < resume.riders
           ? `${resume.withBike} of ${resume.riders} bikes picked`
-          : `${resume.riders - resume.ridersReady} of ${resume.riders} riders still need a name and height`;
+          : `${resume.riders - resume.ridersReady} of ${resume.riders} riders still need a height`;
   const cta = resume.ownBike || resume.href.startsWith("/checkout") ? "Continue to checkout" : "Continue booking";
 
   return (
